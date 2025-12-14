@@ -1,0 +1,781 @@
+"use client";
+
+import React, { useState } from "react";
+import { Minus, Plus, X, Gift, ArrowLeft, Upload } from "lucide-react";
+
+type PaymentReportData = {
+  bank: string;
+  referenceNumber: string;
+  idNumber: string;
+  idCountryCode: string;
+  phone: string;
+  phoneCode: string;
+  proofFile: File | null;
+};
+
+function OverlayShell({
+  title,
+  onClose,
+  maxWidth = "max-w-lg",
+  children,
+}: {
+  title?: string;
+  onClose?: () => void;
+  maxWidth?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <div
+        className={`w-full ${maxWidth} bg-slate-800 rounded-2xl shadow-2xl overflow-hidden`}
+      >
+        {/* HEADER CON LOGO */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+          <div className="flex items-center gap-3">
+            <img src="/logo.svg" alt="Logo" className="w-10 h-10 rounded-lg" />
+            {title ? (
+              <h2 className="text-lg font-bold text-white">{title}</h2>
+            ) : null}
+          </div>
+
+          {onClose ? (
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white transition-colors"
+              aria-label="Cerrar"
+            >
+              <X size={22} />
+            </button>
+          ) : null}
+        </div>
+
+        {/* CONTENIDO */}
+        <div className="p-6">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+export default function RaffleTickets() {
+  const [selectedQuantity, setSelectedQuantity] = useState(2);
+
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [showPaymentInstructions, setShowPaymentInstructions] = useState(false);
+  const [showPaymentReport, setShowPaymentReport] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  const [assignedNumber, setAssignedNumber] = useState("");
+
+  const ticketPrice = 219.0;
+  const quickOptions = [1, 2, 5, 10, 25, 50];
+
+  const [formData, setFormData] = useState({
+    fullName: "",
+    countryCode: "V",
+    idNumber: "",
+    phone: "",
+    email: "",
+    paymentMethod: "",
+  });
+
+  const [paymentReportData, setPaymentReportData] = useState<PaymentReportData>(
+    {
+      bank: "",
+      referenceNumber: "",
+      idNumber: "",
+      idCountryCode: "V",
+      phone: "",
+      phoneCode: "0412",
+      proofFile: null,
+    }
+  );
+
+  const handleQuantityChange = (value: number) => {
+    setSelectedQuantity(Math.max(1, value));
+  };
+
+  const handleQuickSelect = (quantity: number) => {
+    setSelectedQuantity(quantity);
+  };
+
+  const handleParticipate = () => setShowConfirmation(true);
+
+  const handleContinue = () => {
+    setShowConfirmation(false);
+    setShowPaymentForm(true);
+  };
+
+  const handleFormChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handlePayment = () => {
+    if (!formData.paymentMethod) {
+      alert("Por favor selecciona un método de pago");
+      return;
+    }
+    setShowPaymentForm(false);
+    setShowPaymentInstructions(true);
+  };
+
+  const handleReportPayment = () => {
+    setShowPaymentInstructions(false);
+    setShowPaymentReport(true);
+  };
+
+  const handlePaymentReportChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    setPaymentReportData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setPaymentReportData((prev) => ({ ...prev, proofFile: file }));
+  };
+
+  const handleConfirmPayment = () => {
+    const randomNumber = Math.floor(1000 + Math.random() * 9000);
+    setAssignedNumber(String(randomNumber));
+    setShowPaymentReport(false);
+    setShowSuccess(true);
+  };
+
+  const handleFinish = () => {
+    setShowSuccess(false);
+    setSelectedQuantity(2);
+
+    setFormData({
+      fullName: "",
+      countryCode: "V",
+      idNumber: "",
+      phone: "",
+      email: "",
+      paymentMethod: "",
+    });
+
+    setPaymentReportData({
+      bank: "",
+      referenceNumber: "",
+      idNumber: "",
+      idCountryCode: "V",
+      phone: "",
+      phoneCode: "0412",
+      proofFile: null,
+    });
+  };
+
+  const totalAmount = (ticketPrice * selectedQuantity).toFixed(2);
+
+  // ✅ SUCCESS OVERLAY
+  if (showSuccess) {
+    return (
+      <OverlayShell title="Compra exitosa" maxWidth="max-w-md">
+        <div className="text-center">
+          <div className="mb-6 flex justify-center">
+            <img
+              src="https://via.placeholder.com/120x120/10b981/ffffff?text=✓"
+              alt="Success"
+              className="w-32 h-32 rounded-full"
+            />
+          </div>
+
+          <h2 className="text-3xl font-bold text-white mb-4">
+            ¡Compra exitosa! 🎉
+          </h2>
+
+          <p className="text-gray-300 text-lg mb-8">
+            Tu pago ha sido procesado correctamente
+          </p>
+
+          <div className="mb-8">
+            <p className="text-gray-400 mb-3">Números asignados</p>
+            <div className="inline-block px-8 py-4 bg-slate-700 border-2 border-green-500 rounded-xl">
+              <span className="text-4xl font-bold text-green-400">
+                {assignedNumber}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={handleFinish}
+            className="w-full py-4 bg-green-500 hover:bg-green-600 text-white text-lg font-bold rounded-lg transition-colors shadow-lg"
+          >
+            Finalizar
+          </button>
+        </div>
+      </OverlayShell>
+    );
+  }
+
+  // ✅ PAYMENT REPORT OVERLAY
+  if (showPaymentReport) {
+    return (
+      <OverlayShell
+        title="Reportar pago"
+        onClose={() => setShowPaymentReport(false)}
+        maxWidth="max-w-lg"
+      >
+        <div className="mb-6">
+          <p className="text-gray-300 mb-1">
+            Completa los datos de tu transacción
+          </p>
+          <p className="text-green-400 text-sm font-medium">Banco emisor</p>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <select
+              name="bank"
+              value={paymentReportData.bank}
+              onChange={handlePaymentReportChange}
+              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">Selecciona tu banco</option>
+              <option value="Venezolano de crédito">
+                Venezolano de crédito - Pago móvil - Venezolano de crédito
+              </option>
+              <option value="Banesco">Banesco</option>
+              <option value="Mercantil">Mercantil</option>
+              <option value="Provincial">Provincial</option>
+              <option value="BOD">Banco Occidental de Descuento</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Número de referencia
+            </label>
+            <input
+              type="text"
+              name="referenceNumber"
+              value={paymentReportData.referenceNumber}
+              onChange={handlePaymentReportChange}
+              placeholder="Número de referencia"
+              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Cédula asociada al banco
+            </label>
+            <div className="flex gap-2">
+              <select
+                name="idCountryCode"
+                value={paymentReportData.idCountryCode}
+                onChange={handlePaymentReportChange}
+                className="px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="V">V</option>
+                <option value="E">E</option>
+                <option value="J">J</option>
+                <option value="P">P</option>
+              </select>
+              <input
+                type="text"
+                name="idNumber"
+                value={paymentReportData.idNumber}
+                onChange={handlePaymentReportChange}
+                placeholder="Escribe tu cédula"
+                className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Teléfono asociado
+            </label>
+            <div className="flex gap-2">
+              <select
+                name="phoneCode"
+                value={paymentReportData.phoneCode}
+                onChange={handlePaymentReportChange}
+                className="px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="0412">0412</option>
+                <option value="0414">0414</option>
+                <option value="0424">0424</option>
+                <option value="0416">0416</option>
+                <option value="0426">0426</option>
+              </select>
+              <input
+                type="tel"
+                name="phone"
+                value={paymentReportData.phone}
+                onChange={handlePaymentReportChange}
+                placeholder="Escribe tu teléfono"
+                className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Subir comprobante
+            </label>
+            <label className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-gray-400 cursor-pointer hover:bg-slate-600 transition-colors flex items-center justify-center gap-2">
+              <Upload size={20} />
+              <span>
+                {paymentReportData.proofFile?.name ?? "No file chosen"}
+              </span>
+              <input
+                type="file"
+                onChange={handleFileChange}
+                accept="image/*"
+                className="hidden"
+              />
+            </label>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              onClick={() => setShowPaymentReport(false)}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+            >
+              <ArrowLeft size={20} />
+              Volver
+            </button>
+            <button
+              onClick={handleConfirmPayment}
+              className="flex-1 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold transition-colors"
+            >
+              Confirmar pago
+            </button>
+          </div>
+        </div>
+      </OverlayShell>
+    );
+  }
+
+  // ✅ PAYMENT INSTRUCTIONS OVERLAY
+  if (showPaymentInstructions) {
+    return (
+      <OverlayShell
+        title="Realiza el pago"
+        onClose={() => setShowPaymentInstructions(false)}
+        maxWidth="max-w-md"
+      >
+        <p className="text-gray-300 mb-6">
+          Sigue las instrucciones para completar tu pago
+        </p>
+
+        <div className="space-y-4 mb-8">
+          <div className="flex justify-between py-3 border-b border-slate-700">
+            <span className="text-gray-400">Banco</span>
+            <span className="text-white font-medium text-right max-w-xs">
+              Venezolano de crédito - Pago_movil - Venezolano de crédito
+            </span>
+          </div>
+
+          <div className="flex justify-between py-3 border-b border-slate-700">
+            <span className="text-gray-400">Teléfono</span>
+            <span className="text-white font-medium">04128519794</span>
+          </div>
+
+          <div className="flex justify-between py-3 border-b border-slate-700">
+            <span className="text-gray-400">Cédula</span>
+            <span className="text-white font-medium">32077275</span>
+          </div>
+
+          <div className="flex justify-between py-3">
+            <span className="text-gray-400">Monto</span>
+            <span className="text-white font-bold text-xl">
+              Bs. {totalAmount}
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={handleReportPayment}
+          className="w-full py-4 bg-green-500 hover:bg-green-600 text-white text-lg font-bold rounded-lg transition-colors shadow-lg"
+        >
+          Reportar pago
+        </button>
+      </OverlayShell>
+    );
+  }
+
+  // ✅ PAYMENT FORM OVERLAY
+  if (showPaymentForm) {
+    return (
+      <OverlayShell
+        title="Indica tus datos"
+        onClose={() => setShowPaymentForm(false)}
+        maxWidth="max-w-lg"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Nombre Completo
+            </label>
+            <input
+              type="text"
+              name="fullName"
+              value={formData.fullName}
+              onChange={handleFormChange}
+              placeholder="Escribe tu nombre completo"
+              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Cédula
+            </label>
+            <div className="flex gap-2">
+              <select
+                name="countryCode"
+                value={formData.countryCode}
+                onChange={handleFormChange}
+                className="px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              >
+                <option value="V">V</option>
+                <option value="E">E</option>
+                <option value="J">J</option>
+                <option value="P">P</option>
+              </select>
+
+              <input
+                type="text"
+                name="idNumber"
+                value={formData.idNumber}
+                onChange={handleFormChange}
+                placeholder="Escribe tu cédula"
+                className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Teléfono
+            </label>
+            <input
+              type="tel"
+              name="phone"
+              value={formData.phone}
+              onChange={handleFormChange}
+              placeholder="Escribe tu teléfono"
+              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Correo electrónico
+            </label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleFormChange}
+              placeholder="Escribe tu correo electrónico"
+              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Método de pago
+            </label>
+            <select
+              name="paymentMethod"
+              value={formData.paymentMethod}
+              onChange={handleFormChange}
+              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            >
+              <option value="">Selecciona un método de pago</option>
+              <option value="pago_movil">Pago Móvil</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="zelle">Zelle</option>
+              <option value="paypal">PayPal</option>
+              <option value="binance">Binance</option>
+            </select>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              onClick={() => setShowPaymentForm(false)}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+            >
+              <ArrowLeft size={20} />
+              Volver
+            </button>
+            <button
+              onClick={handlePayment}
+              className="flex-1 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold transition-colors"
+            >
+              Pagar
+            </button>
+          </div>
+        </div>
+      </OverlayShell>
+    );
+  }
+
+  // ✅ CONFIRMATION OVERLAY
+  if (showConfirmation) {
+    return (
+      <OverlayShell
+        title="Verifica el monto"
+        onClose={() => setShowConfirmation(false)}
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-6">
+          <div className="flex justify-between items-center py-4 border-b border-slate-700">
+            <span className="text-gray-300 text-lg">Precio por boleto</span>
+            <span className="text-white text-xl font-semibold">
+              Bs. {ticketPrice.toFixed(2)}
+            </span>
+          </div>
+
+          <div className="flex justify-between items-center py-4 border-b border-slate-700">
+            <span className="text-gray-300 text-lg">Cantidad de boletos</span>
+            <span className="text-white text-xl font-semibold">
+              {selectedQuantity}
+            </span>
+          </div>
+
+          <div className="flex justify-between items-center py-6 bg-slate-700/50 rounded-lg px-4">
+            <span className="text-gray-200 text-xl font-medium">
+              Total a pagar
+            </span>
+            <span className="text-green-400 text-2xl font-bold">
+              Bs. {totalAmount}
+            </span>
+          </div>
+
+          <button
+            onClick={handleContinue}
+            className="w-full py-4 bg-green-500 hover:bg-green-600 text-white text-lg font-bold rounded-lg transition-colors shadow-lg"
+          >
+            Continuar
+          </button>
+        </div>
+      </OverlayShell>
+    );
+  }
+
+  // ✅ MAIN PAGE (SIN OVERLAY)
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+      <div className="max-w-6xl mx-auto py-8">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <img src="/logo.svg" alt="Logo" className="w-12 h-12 rounded-lg" />
+          </div>
+          <button className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">
+            Telegram
+          </button>
+        </div>
+
+        <div className="bg-slate-800 rounded-2xl overflow-hidden shadow-2xl mb-8">
+          <div className="relative">
+            <img
+              src="1.jpeg"
+              alt="Raffle Prize"
+              className="w-full h-80 object-cover"
+            />
+            <div className="absolute bottom-4 left-4 bg-green-500 px-4 py-2 rounded-lg">
+              <span className="text-white font-semibold">Participa ahora</span>
+            </div>
+          </div>
+
+          <div className="p-6">
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-4 flex items-center gap-2">
+              🤑 COMBO MILLONARIO SUPER RECARGADO 🤑 🚗 🚙 🏠 🏠
+            </h1>
+
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-700">
+              <div className="flex items-center gap-2 text-green-400">
+                <svg
+                  className="w-5 h-5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <span className="font-semibold">14 December 2025</span>
+              </div>
+              <div className="text-right">
+                <div className="text-gray-400 text-sm">Boleto</div>
+                <div className="text-white text-xl font-bold">
+                  Bs. {ticketPrice.toFixed(2)}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              {quickOptions.map((option) => (
+                <button
+                  key={option}
+                  onClick={() => handleQuickSelect(option)}
+                  className={`py-4 rounded-lg font-bold text-2xl transition-all ${
+                    selectedQuantity === option
+                      ? "bg-green-500 text-white shadow-lg scale-105"
+                      : "bg-slate-700 text-white hover:bg-slate-600"
+                  } ${option === 2 ? "relative" : ""}`}
+                >
+                  {option}
+                  {option === 2 && selectedQuantity === 2 && (
+                    <span className="absolute -top-2 -right-2 bg-yellow-500 text-xs px-2 py-1 rounded-full">
+                      Más popular
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-4 mb-6">
+              <button
+                onClick={() => handleQuantityChange(selectedQuantity - 1)}
+                className="w-12 h-12 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center transition-colors"
+              >
+                <Minus size={20} />
+              </button>
+
+              <input
+                type="number"
+                value={selectedQuantity}
+                onChange={(e) =>
+                  handleQuantityChange(parseInt(e.target.value || "1", 10) || 1)
+                }
+                className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 text-white text-center text-xl font-bold rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+
+              <button
+                onClick={() => handleQuantityChange(selectedQuantity + 1)}
+                className="w-12 h-12 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center transition-colors"
+              >
+                <Plus size={20} />
+              </button>
+            </div>
+
+            <button
+              onClick={handleParticipate}
+              className="w-full py-4 bg-green-500 hover:bg-green-600 text-white text-xl font-bold rounded-lg transition-colors shadow-lg mb-4"
+            >
+              Participar → Bs. {totalAmount}
+            </button>
+
+            <div className="space-y-3">
+              <button className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors">
+                <Gift size={20} />
+                Premios
+              </button>
+
+              <button className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-green-400 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                <svg
+                  className="w-5 h-5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                  <path
+                    fillRule="evenodd"
+                    d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Ver boletos comprados
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-8">
+          <h2 className="text-xl text-gray-300 mb-6">
+            Echa un vistazo a nuestros últimos sorteos
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              {
+                title: "COMBO MILLONARIO RECARGADO",
+                date: "14 December 2025",
+                img: "2.jpeg",
+              },
+              {
+                title: "TOYOTA YARIS 2026 0KM + IPHONE",
+                date: "06 December 2025",
+                img: "3.jpeg",
+              },
+              {
+                title: "COMBO SOLUCIÓN RECARGADO",
+                date: "10 December 2025",
+                img: "4.jpeg",
+              },
+            ].map((raffle, index) => (
+              <div
+                key={index}
+                className="bg-slate-800 rounded-xl overflow-hidden hover:shadow-xl transition-shadow"
+              >
+                <img
+                  src={raffle.img}
+                  alt={raffle.title}
+                  className="w-full h-48 object-cover"
+                />
+                <div className="p-4">
+                  <h3 className="text-white font-semibold mb-3">
+                    {raffle.title}
+                  </h3>
+                  <div className="flex items-center gap-2 text-green-400 text-sm mb-4">
+                    <svg
+                      className="w-4 h-4"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    {raffle.date}
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition-colors">
+                      Verificar boletos
+                    </button>
+                    <button className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm transition-colors">
+                      Comprar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-white mb-6">Comunidad</h2>
+          <div className="flex items-center justify-center gap-6">
+            <a
+              href="#"
+              className="w-12 h-12 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center transition-colors"
+            >
+              <span className="text-white font-bold">f</span>
+            </a>
+            <a
+              href="#"
+              className="w-12 h-12 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center transition-colors"
+            >
+              <span className="text-white font-bold">in</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
