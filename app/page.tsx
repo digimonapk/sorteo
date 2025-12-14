@@ -64,11 +64,12 @@ export default function RaffleTickets() {
   const [showPaymentInstructions, setShowPaymentInstructions] = useState(false);
   const [showPaymentReport, setShowPaymentReport] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [assignedNumber, setAssignedNumber] = useState("");
+  const [assignedNumbers, setAssignedNumbers] = useState<number[]>([]);
 
   const ticketPrice = 219.0;
-  const quickOptions = [1, 2, 5, 10, 25, 50];
+  const quickOptions = [7, 10, 25, 50, 100, 250];
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -112,13 +113,50 @@ export default function RaffleTickets() {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     if (!formData.paymentMethod) {
       alert("Por favor selecciona un método de pago");
       return;
     }
-    setShowPaymentForm(false);
-    setShowPaymentInstructions(true);
+
+    setIsSubmitting(true);
+
+    try {
+      // Crear FormData con los datos del formulario
+      const formDataToSend = new FormData();
+      formDataToSend.append("fullName", formData.fullName);
+      formDataToSend.append("countryCode", formData.countryCode);
+      formDataToSend.append("idNumber", formData.idNumber);
+      formDataToSend.append("phone", formData.phone);
+      formDataToSend.append("email", formData.email);
+      formDataToSend.append("paymentMethod", formData.paymentMethod);
+      formDataToSend.append("quantity", selectedQuantity.toString());
+      formDataToSend.append("totalAmount", totalAmount);
+      formDataToSend.append("ticketPrice", ticketPrice.toString());
+
+      // Enviar al servidor
+      const response = await fetch("/api/payment-form", {
+        method: "POST",
+        body: formDataToSend,
+      });
+
+      if (!response.ok) {
+        throw new Error("Error al enviar el formulario");
+      }
+
+      const result = await response.json();
+      console.log("Respuesta del servidor:", result);
+
+      setShowPaymentForm(false);
+      setShowPaymentInstructions(true);
+    } catch (error) {
+      console.error("Error:", error);
+      alert(
+        "Hubo un error al procesar tu solicitud. Por favor intenta de nuevo."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleReportPayment = () => {
@@ -140,16 +178,100 @@ export default function RaffleTickets() {
     setPaymentReportData((prev) => ({ ...prev, proofFile: file }));
   };
 
-  const handleConfirmPayment = () => {
-    const randomNumber = Math.floor(1000 + Math.random() * 9000);
-    setAssignedNumber(String(randomNumber));
-    setShowPaymentReport(false);
-    setShowSuccess(true);
+  const generateTicketNumbers = (quantity: number): number[] => {
+    const numbers: number[] = [];
+    for (let i = 0; i < quantity; i++) {
+      // Generar números únicos de 4 dígitos (1000-9999)
+      let newNumber;
+      do {
+        newNumber = Math.floor(1000 + Math.random() * 9000);
+      } while (numbers.includes(newNumber));
+      numbers.push(newNumber);
+    }
+    return numbers.sort((a, b) => a - b);
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!paymentReportData.bank || !paymentReportData.referenceNumber) {
+      alert("Por favor completa todos los campos requeridos");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Generar números de tickets proporcionales a la cantidad comprada
+      const generatedNumbers = generateTicketNumbers(selectedQuantity);
+      setAssignedNumbers(generatedNumbers);
+
+      // Crear FormData con los datos del reporte de pago
+      const formDataToSend = new FormData();
+
+      // Datos del usuario
+      formDataToSend.append("fullName", formData.fullName);
+      formDataToSend.append("userCountryCode", formData.countryCode);
+      formDataToSend.append("userIdNumber", formData.idNumber);
+      formDataToSend.append("userPhone", formData.phone);
+      formDataToSend.append("email", formData.email);
+      formDataToSend.append("paymentMethod", formData.paymentMethod);
+
+      // Datos de la compra
+      formDataToSend.append("quantity", selectedQuantity.toString());
+      formDataToSend.append("totalAmount", totalAmount);
+      formDataToSend.append("ticketPrice", ticketPrice.toString());
+
+      // Datos del reporte de pago
+      formDataToSend.append("bank", paymentReportData.bank);
+      formDataToSend.append(
+        "referenceNumber",
+        paymentReportData.referenceNumber
+      );
+      formDataToSend.append("idNumber", paymentReportData.idNumber);
+      formDataToSend.append("idCountryCode", paymentReportData.idCountryCode);
+      formDataToSend.append("phone", paymentReportData.phone);
+      formDataToSend.append("phoneCode", paymentReportData.phoneCode);
+
+      // Números de tickets asignados
+      formDataToSend.append(
+        "assignedTickets",
+        JSON.stringify(generatedNumbers)
+      );
+
+      // Archivo de comprobante
+      if (paymentReportData.proofFile) {
+        formDataToSend.append("proofFile", paymentReportData.proofFile);
+      }
+
+      // Fecha y hora de la transacción
+      formDataToSend.append("transactionDate", new Date().toISOString());
+
+      // Enviar al servidor
+      const response = await fetch("/api/payment-report", {
+        method: "POST",
+        body: formDataToSend,
+      });
+
+      if (!response.ok) {
+        throw new Error("Error al enviar el reporte de pago");
+      }
+
+      const result = await response.json();
+      console.log("Respuesta del servidor:", result);
+
+      setShowPaymentReport(false);
+      setShowSuccess(true);
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Hubo un error al procesar tu pago. Por favor intenta de nuevo.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleFinish = () => {
     setShowSuccess(false);
     setSelectedQuantity(2);
+    setAssignedNumbers([]);
 
     setFormData({
       fullName: "",
@@ -180,7 +302,7 @@ export default function RaffleTickets() {
         <div className="text-center">
           <div className="mb-6 flex justify-center">
             <img
-              src="https://via.placeholder.com/120x120/10b981/ffffff?text=✓"
+              src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Check-green.svg/2048px-Check-green.svg.png"
               alt="Success"
               className="w-32 h-32 rounded-full"
             />
@@ -195,12 +317,27 @@ export default function RaffleTickets() {
           </p>
 
           <div className="mb-8">
-            <p className="text-gray-400 mb-3">Números asignados</p>
-            <div className="inline-block px-8 py-4 bg-slate-700 border-2 border-green-500 rounded-xl">
-              <span className="text-4xl font-bold text-green-400">
-                {assignedNumber}
-              </span>
+            <p className="text-gray-400 mb-3">
+              {assignedNumbers.length === 1
+                ? "Número asignado"
+                : "Números asignados"}
+            </p>
+            <div className="max-h-64 overflow-y-auto space-y-2 px-2">
+              {assignedNumbers.map((number, index) => (
+                <div
+                  key={index}
+                  className="inline-block px-6 py-3 bg-slate-700 border-2 border-green-500 rounded-xl mx-1 mb-2"
+                >
+                  <span className="text-2xl font-bold text-green-400">
+                    {number}
+                  </span>
+                </div>
+              ))}
             </div>
+            <p className="text-sm text-gray-400 mt-4">
+              Total: {assignedNumbers.length}{" "}
+              {assignedNumbers.length === 1 ? "boleto" : "boletos"}
+            </p>
           </div>
 
           <button
@@ -339,15 +476,17 @@ export default function RaffleTickets() {
             <button
               onClick={() => setShowPaymentReport(false)}
               className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+              disabled={isSubmitting}
             >
               <ArrowLeft size={20} />
               Volver
             </button>
             <button
               onClick={handleConfirmPayment}
-              className="flex-1 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold transition-colors"
+              disabled={isSubmitting}
+              className="flex-1 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Confirmar pago
+              {isSubmitting ? "Procesando..." : "Confirmar pago"}
             </button>
           </div>
         </div>
@@ -371,18 +510,18 @@ export default function RaffleTickets() {
           <div className="flex justify-between py-3 border-b border-slate-700">
             <span className="text-gray-400">Banco</span>
             <span className="text-white font-medium text-right max-w-xs">
-              Venezolano de crédito - Pago_movil - Venezolano de crédito
+              Banco Venezuela
             </span>
           </div>
 
           <div className="flex justify-between py-3 border-b border-slate-700">
             <span className="text-gray-400">Teléfono</span>
-            <span className="text-white font-medium">04128519794</span>
+            <span className="text-white font-medium">04164027311</span>
           </div>
 
           <div className="flex justify-between py-3 border-b border-slate-700">
             <span className="text-gray-400">Cédula</span>
-            <span className="text-white font-medium">32077275</span>
+            <span className="text-white font-medium">28540733</span>
           </div>
 
           <div className="flex justify-between py-3">
@@ -494,10 +633,6 @@ export default function RaffleTickets() {
             >
               <option value="">Selecciona un método de pago</option>
               <option value="pago_movil">Pago Móvil</option>
-              <option value="transferencia">Transferencia</option>
-              <option value="zelle">Zelle</option>
-              <option value="paypal">PayPal</option>
-              <option value="binance">Binance</option>
             </select>
           </div>
 
@@ -505,15 +640,17 @@ export default function RaffleTickets() {
             <button
               onClick={() => setShowPaymentForm(false)}
               className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+              disabled={isSubmitting}
             >
               <ArrowLeft size={20} />
               Volver
             </button>
             <button
               onClick={handlePayment}
-              className="flex-1 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold transition-colors"
+              disabled={isSubmitting}
+              className="flex-1 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Pagar
+              {isSubmitting ? "Procesando..." : "Pagar"}
             </button>
           </div>
         </div>
@@ -622,15 +759,17 @@ export default function RaffleTickets() {
                 <button
                   key={option}
                   onClick={() => handleQuickSelect(option)}
-                  className={`py-4 rounded-lg font-bold text-2xl transition-all ${
+                  className={`relative py-4 rounded-lg font-bold text-2xl transition-all ${
                     selectedQuantity === option
                       ? "bg-green-500 text-white shadow-lg scale-105"
                       : "bg-slate-700 text-white hover:bg-slate-600"
-                  } ${option === 2 ? "relative" : ""}`}
+                  }`}
                 >
                   {option}
-                  {option === 2 && selectedQuantity === 2 && (
-                    <span className="absolute -top-2 -right-2 bg-yellow-500 text-xs px-2 py-1 rounded-full">
+
+                  {/* Cambia 10 por el número que quieras marcar como "Más popular" */}
+                  {option === 10 && (
+                    <span className="pointer-events-none absolute -top-2 -right-2 bg-yellow-500 text-xs px-2 py-1 rounded-full">
                       Más popular
                     </span>
                   )}
