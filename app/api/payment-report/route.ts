@@ -18,7 +18,7 @@ const SMTP_PORT = 465;
 const SMTP_SECURE = true;
 const SMTP_USER = "ganaconivans@gmail.com";
 const SMTP_PASS = "iusg psbo pbjs oyqv"; // NO tu contraseña normal
-const EMAIL_FROM = `"Rifa" <${SMTP_USER}>`;
+const EMAIL_FROM = `"Gana con Iván" <${SMTP_USER}>`;
 
 function escapeHtml(text: string) {
   return (text || "")
