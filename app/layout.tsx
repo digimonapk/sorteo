@@ -16,6 +16,7 @@ export const metadata: Metadata = {
   title: "Gana con Ivan",
   description: "Sorteos todo colombia",
 };
+export const runtime = "nodejs";
 
 export default function RootLayout({
   children,

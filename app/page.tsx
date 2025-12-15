@@ -744,7 +744,7 @@ export default function RaffleTickets() {
                     clipRule="evenodd"
                   />
                 </svg>
-                <span className="font-semibold">14 December 2025</span>
+                <span className="font-semibold">21 Diciembre 2025</span>
               </div>
               <div className="text-right">
                 <div className="text-gray-400 text-sm">Boleto</div>
@@ -842,7 +842,7 @@ export default function RaffleTickets() {
             {[
               {
                 title: "COMBO MILLONARIO RECARGADO",
-                date: "14 December 2025",
+                date: "21 Deciembre 025",
                 img: "2.jpeg",
               },
               {
