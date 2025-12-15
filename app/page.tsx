@@ -375,13 +375,55 @@ export default function RaffleTickets() {
               className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               <option value="">Selecciona tu banco</option>
-              <option value="Venezolano de crédito">
-                Venezolano de crédito - Pago móvil - Venezolano de crédito
+
+              {/* Banca pública */}
+              <option value="Banco de Venezuela">Banco de Venezuela</option>
+              <option value="Banco del Tesoro">Banco del Tesoro</option>
+              <option value="Banco Bicentenario">Banco Bicentenario</option>
+              <option value="Banco de Desarrollo Económico y Social de Venezuela (BANDES)">
+                BANDES
               </option>
+              <option value="Banco Agrícola de Venezuela">
+                Banco Agrícola de Venezuela
+              </option>
+              <option value="Banco Nacional de Crédito (BNC)">
+                Banco Nacional de Crédito (BNC)
+              </option>
+
+              {/* Banca privada */}
               <option value="Banesco">Banesco</option>
-              <option value="Mercantil">Mercantil</option>
-              <option value="Provincial">Provincial</option>
-              <option value="BOD">Banco Occidental de Descuento</option>
+              <option value="Banco Mercantil">Banco Mercantil</option>
+              <option value="BBVA Provincial">BBVA Provincial</option>
+              <option value="Banco Venezolano de Crédito">
+                Banco Venezolano de Crédito
+              </option>
+              <option value="Bancaribe">Bancaribe</option>
+              <option value="Banco Exterior">Banco Exterior</option>
+              <option value="Banco Plaza">Banco Plaza</option>
+              <option value="Banco Caroní">Banco Caroní</option>
+              <option value="Banco Sofitasa">Banco Sofitasa</option>
+              <option value="Banco Fondo Común (BFC)">
+                Banco Fondo Común (BFC)
+              </option>
+              <option value="Banco Activo">Banco Activo</option>
+              <option value="Banco Nacional de Fomento (no usar si no aplica)">
+                Banco Nacional de Fomento (si aplica)
+              </option>
+
+              {/* Microfinancieras / regionales */}
+              <option value="Banco del Sur">Banco del Sur</option>
+              <option value="Bancrecer">Bancrecer</option>
+              <option value="Bangente">Bangente</option>
+              <option value="Mi Banco">Mi Banco</option>
+
+              {/* Digitales / pagos */}
+              <option value="100% Banco">100% Banco</option>
+              <option value="Bancamiga">Bancamiga</option>
+
+              {/* Otros conocidos */}
+              <option value="Banco Occidental de Descuento (BOD)">
+                Banco Occidental de Descuento (BOD)
+              </option>
             </select>
           </div>
 
