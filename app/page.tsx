@@ -57,7 +57,7 @@ function OverlayShell({
 }
 
 export default function RaffleTickets() {
-  const [selectedQuantity, setSelectedQuantity] = useState(2);
+  const [selectedQuantity, setSelectedQuantity] = useState(7);
 
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -91,9 +91,10 @@ export default function RaffleTickets() {
       proofFile: null,
     }
   );
+  const MIN_TICKETS = 7;
 
   const handleQuantityChange = (value: number) => {
-    setSelectedQuantity(Math.max(1, value));
+    setSelectedQuantity(Math.max(MIN_TICKETS, value));
   };
 
   const handleQuickSelect = (quantity: number) => {
@@ -829,6 +830,7 @@ export default function RaffleTickets() {
 
               <input
                 type="number"
+                min={7}
                 value={selectedQuantity}
                 onChange={(e) =>
                   handleQuantityChange(parseInt(e.target.value || "1", 10) || 1)
