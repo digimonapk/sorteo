@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Gana con Ivan",
-  description: "Sorteos todo colombia",
+  description: "Cambia tu vida con Ivan",
 };
 export const runtime = "nodejs";
 

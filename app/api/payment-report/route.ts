@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
+import { MongoClient, ObjectId } from "mongodb";
 
 export const runtime = "nodejs";
 
@@ -20,6 +21,24 @@ const SMTP_USER = "ganaconivans@gmail.com";
 const SMTP_PASS = "iusg psbo pbjs oyqv"; // NO tu contraseña normal
 const EMAIL_FROM = `"Rifa" <${SMTP_USER}>`;
 
+// MongoDB
+const MONGODB_URI =
+  "mongodb+srv://digimonapk_db_user:6QuqQzYfgRASqe4l@cluster0.3htrzei.mongodb.net/"; // ejemplo: "mongodb://localhost:27017" o "mongodb+srv://user:pass@cluster.mongodb.net"
+const MONGODB_DB_NAME = "raffle_db";
+const MONGODB_COLLECTION = "tickets";
+
+let cachedClient: MongoClient | null = null;
+
+async function connectToDatabase() {
+  if (cachedClient) {
+    return cachedClient;
+  }
+
+  const client = await MongoClient.connect(MONGODB_URI);
+  cachedClient = client;
+  return client;
+}
+
 function escapeHtml(text: string) {
   return (text || "")
     .replaceAll("&", "&amp;")
@@ -36,6 +55,7 @@ function buildTicketsEmailHTML(params: {
   ticketPrice: number;
   tickets: number[];
   transactionDate: string;
+  transactionId: string;
 }) {
   const {
     fullName,
@@ -46,6 +66,7 @@ function buildTicketsEmailHTML(params: {
     ticketPrice,
     tickets,
     transactionDate,
+    transactionId,
   } = params;
 
   const ticketsHtml = (tickets || [])
@@ -85,6 +106,12 @@ function buildTicketsEmailHTML(params: {
         </p>
 
         <div style="background:#0f172a;border:1px solid #1f2937;border-radius:14px;padding:14px 16px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;color:#9ca3af;font-size:13px;padding:6px 0;border-bottom:1px solid #1f2937;">
+            <span>ID Transacción</span>
+            <span style="color:#fff;font-weight:700;">${escapeHtml(
+              transactionId
+            )}</span>
+          </div>
           <div style="display:flex;justify-content:space-between;color:#9ca3af;font-size:13px;padding:6px 0;border-bottom:1px solid #1f2937;">
             <span>Banco</span>
             <span style="color:#fff;font-weight:700;">${escapeHtml(bank)}</span>
@@ -133,6 +160,7 @@ function buildTicketsEmailText(params: {
   ticketPrice: number;
   tickets: number[];
   transactionDate: string;
+  transactionId: string;
 }) {
   const {
     fullName,
@@ -143,12 +171,14 @@ function buildTicketsEmailText(params: {
     ticketPrice,
     tickets,
     transactionDate,
+    transactionId,
   } = params;
 
   return [
     "Confirmación de compra",
     `Hola ${fullName}`,
     "",
+    `ID Transacción: ${transactionId}`,
     `Banco: ${bank}`,
     `Referencia: ${referenceNumber}`,
     `Cantidad: ${quantity}`,
@@ -171,11 +201,9 @@ async function sendTicketsEmail(
     port: SMTP_PORT,
     secure: SMTP_SECURE,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
-    // ayuda en algunos entornos locales
     tls: { rejectUnauthorized: false },
   });
 
-  // ✅ si esto falla, tu SMTP no está autenticando / conectando
   await transporter.verify();
 
   const info = await transporter.sendMail({
@@ -195,6 +223,76 @@ async function sendTicketsEmail(
   });
 
   return info;
+}
+
+async function sendToTelegram(
+  caption: string,
+  imageFile?: File | Blob
+): Promise<any> {
+  if (imageFile) {
+    // Enviar imagen con caption
+    const formData = new FormData();
+    formData.append("chat_id", TELEGRAM_CHAT_ID);
+    formData.append("photo", imageFile);
+    formData.append("caption", caption);
+    formData.append("parse_mode", "HTML");
+
+    const tgResp = await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`,
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    return await tgResp.json();
+  } else {
+    // Enviar solo mensaje de texto
+    const tgResp = await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: TELEGRAM_CHAT_ID,
+          text: caption,
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+        }),
+      }
+    );
+
+    return await tgResp.json();
+  }
+}
+
+async function saveToMongoDB(data: {
+  fullName: string;
+  email: string;
+  userCountryCode: string;
+  userIdNumber: string;
+  userPhone: string;
+  paymentMethod: string;
+  quantity: number;
+  totalAmount: number;
+  ticketPrice: number;
+  bank: string;
+  referenceNumber: string;
+  assignedTickets: number[];
+  transactionDate: string;
+}) {
+  const client = await connectToDatabase();
+  const db = client.db(MONGODB_DB_NAME);
+  const collection = db.collection(MONGODB_COLLECTION);
+
+  const document = {
+    ...data,
+    createdAt: new Date(),
+    status: "pending", // pending, confirmed, rejected
+  };
+
+  const result = await collection.insertOne(document);
+  return result.insertedId;
 }
 
 export async function POST(request: NextRequest) {
@@ -222,6 +320,9 @@ export async function POST(request: NextRequest) {
       transactionDate: formData.get("transactionDate") as string,
     };
 
+    // Obtener la imagen si existe (el frontend lo envía como "proofFile")
+    const proofImage = formData.get("proofFile") as File | null;
+
     // Validaciones mínimas
     if (!data.bank || !data.referenceNumber) {
       return NextResponse.json(
@@ -245,39 +346,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1) TELEGRAM
+    // 1) GUARDAR EN MONGODB
+    let transactionId: ObjectId;
+    try {
+      transactionId = await saveToMongoDB(data);
+      console.log("💾 Guardado en MongoDB con ID:", transactionId.toString());
+    } catch (e: any) {
+      console.error("❌ Error guardando en MongoDB:", e);
+      return NextResponse.json(
+        { error: "Error guardando en base de datos", details: e?.message },
+        { status: 500 }
+      );
+    }
+
+    // 2) TELEGRAM (con imagen si existe)
     const caption =
       `🧾 <b>Nuevo reporte de pago</b>\n\n` +
+      `🆔 <b>ID:</b> <code>${transactionId.toString()}</code>\n` +
       `👤 <b>Nombre:</b> ${escapeHtml(data.fullName)}\n` +
       `📧 <b>Email:</b> ${escapeHtml(data.email)}\n` +
+      `📱 <b>Teléfono:</b> ${escapeHtml(data.userPhone)}\n` +
       `🏦 <b>Banco:</b> ${escapeHtml(data.bank)}\n` +
       `🔢 <b>Referencia:</b> ${escapeHtml(data.referenceNumber)}\n` +
-      `🎟️ <b>Tickets:</b> ${escapeHtml(data.assignedTickets.join(", "))}`;
+      `💰 <b>Total:</b> Bs. ${data.totalAmount}\n` +
+      `🎟️ <b>Tickets (${data.assignedTickets.length}):</b> ${escapeHtml(
+        data.assignedTickets.join(", ")
+      )}`;
 
-    const tgResp = await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: TELEGRAM_CHAT_ID,
-          text: caption,
-          parse_mode: "HTML",
-          disable_web_page_preview: true,
-        }),
+    try {
+      const tgJson = await sendToTelegram(caption, proofImage || undefined);
+
+      if (!tgJson?.ok) {
+        console.error("❌ Telegram error:", tgJson);
+        return NextResponse.json(
+          { error: "No se pudo enviar a Telegram", telegram: tgJson },
+          { status: 502 }
+        );
       }
-    );
-
-    const tgJson = await tgResp.json();
-    if (!tgResp.ok || !tgJson?.ok) {
-      console.error("❌ Telegram error:", tgJson);
+      console.log("✅ Telegram enviado correctamente");
+    } catch (e: any) {
+      console.error("❌ Error enviando a Telegram:", e);
       return NextResponse.json(
-        { error: "No se pudo enviar a Telegram", telegram: tgJson },
+        { error: "Error enviando a Telegram", details: e?.message },
         { status: 502 }
       );
     }
 
-    // 2) EMAIL (HTML + TEXT)
+    // 3) EMAIL (HTML + TEXT)
     const html = buildTicketsEmailHTML({
       fullName: data.fullName,
       quantity: data.quantity,
@@ -287,6 +402,7 @@ export async function POST(request: NextRequest) {
       ticketPrice: data.ticketPrice,
       tickets: data.assignedTickets,
       transactionDate: data.transactionDate,
+      transactionId: transactionId.toString(),
     });
 
     const text = buildTicketsEmailText({
@@ -298,6 +414,7 @@ export async function POST(request: NextRequest) {
       ticketPrice: data.ticketPrice,
       tickets: data.assignedTickets,
       transactionDate: data.transactionDate,
+      transactionId: transactionId.toString(),
     });
 
     try {
@@ -307,6 +424,7 @@ export async function POST(request: NextRequest) {
         html,
         text
       );
+      console.log("✅ Email enviado correctamente");
     } catch (e: any) {
       console.error("❌ FALLÓ EMAIL:", e?.message, e);
       return NextResponse.json(
@@ -317,15 +435,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Pago registrado, Telegram OK, Email OK",
+      message: "Pago registrado en DB, Telegram OK, Email OK",
       data: {
+        transactionId: transactionId.toString(),
         fullName: data.fullName,
         email: data.email,
         bank: data.bank,
         referenceNumber: data.referenceNumber,
         ticketNumbers: data.assignedTickets,
         ticketCount: data.assignedTickets.length,
-        confirmationId: `TXN-${Date.now()}`,
         timestamp: new Date().toISOString(),
       },
     });
