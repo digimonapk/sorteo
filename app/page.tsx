@@ -197,6 +197,10 @@ export default function RaffleTickets() {
       alert("Por favor completa todos los campos requeridos");
       return;
     }
+    if (!paymentReportData.proofFile) {
+      alert("Suba su comprobante de pago");
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -252,18 +256,26 @@ export default function RaffleTickets() {
         body: formDataToSend,
       });
 
+      const payload = await response.json().catch(() => ({}));
+
       if (!response.ok) {
-        throw new Error("Error al enviar el reporte de pago");
+        throw new Error(
+          payload?.error ||
+            "Hubo un error al procesar tu pago. Por favor intenta de nuevo."
+        );
       }
 
-      const result = await response.json();
+      const result = payload;
       console.log("Respuesta del servidor:", result);
 
       setShowPaymentReport(false);
       setShowSuccess(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
-      alert("Hubo un error al procesar tu pago. Por favor intenta de nuevo.");
+      alert(
+        error?.message ||
+          "Hubo un error al procesar tu pago. Por favor intenta de nuevo."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -553,18 +565,18 @@ export default function RaffleTickets() {
           <div className="flex justify-between py-3 border-b border-slate-700">
             <span className="text-gray-400">Banco</span>
             <span className="text-white font-medium text-right max-w-xs">
-              Banco Provincial
+              Banco de Venezuela
             </span>
           </div>
 
           <div className="flex justify-between py-3 border-b border-slate-700">
             <span className="text-gray-400">Teléfono</span>
-            <span className="text-white font-medium">04145201750</span>
+            <span className="text-white font-medium">04164027311</span>
           </div>
 
           <div className="flex justify-between py-3 border-b border-slate-700">
             <span className="text-gray-400">Cédula</span>
-            <span className="text-white font-medium">7380191</span>
+            <span className="text-white font-medium">28540733</span>
           </div>
 
           <div className="flex justify-between py-3">

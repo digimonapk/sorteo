@@ -14,11 +14,11 @@ const TELEGRAM_BOT_TOKEN = "8051878604:AAG-Uy5xQyBtYRAXnWbEHgSJaxJw69UvAHQ";
 const TELEGRAM_CHAT_ID = "-5034114704";
 
 // Email SMTP (ejemplo: Gmail con App Password)
-const SMTP_HOST = "smtp.gmail.com";
+const SMTP_HOST = "smtp.hostinger.com";
 const SMTP_PORT = 465;
 const SMTP_SECURE = true;
-const SMTP_USER = "ganaconivans@gmail.com";
-const SMTP_PASS = "iusg psbo pbjs oyqv"; // NO tu contraseña normal
+const SMTP_USER = "enviotickets@ganaconivan.shop";
+const SMTP_PASS = "Holas123@@"; // NO tu contraseña normal
 const EMAIL_FROM = `"Gana con Ivan" <${SMTP_USER}>`;
 
 // MongoDB
@@ -236,29 +236,9 @@ async function sendTicketsEmail(
   return info;
 }
 
-async function sendToTelegram(
-  caption: string,
-  imageFile?: File | Blob
-): Promise<any> {
-  if (imageFile) {
-    // Enviar imagen con caption
-    const formData = new FormData();
-    formData.append("chat_id", TELEGRAM_CHAT_ID);
-    formData.append("photo", imageFile);
-    formData.append("caption", caption);
-    formData.append("parse_mode", "HTML");
-
-    const tgResp = await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`,
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
-
-    return await tgResp.json();
-  } else {
-    // Enviar solo mensaje de texto
+async function sendToTelegram(caption: string, imageFile?: File | Blob) {
+  // Si no hay archivo: texto normal
+  if (!imageFile) {
     const tgResp = await fetch(
       `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
       {
@@ -272,9 +252,27 @@ async function sendToTelegram(
         }),
       }
     );
-
     return await tgResp.json();
   }
+
+  // Si hay archivo: manda como DOCUMENTO (acepta cualquier dimensión)
+  const formData = new FormData();
+  formData.append("chat_id", TELEGRAM_CHAT_ID);
+  formData.append("caption", caption);
+  formData.append("parse_mode", "HTML");
+
+  // Mantener nombre si viene como File
+  const fileName = (imageFile as File)?.name || `comprobante-${Date.now()}.jpg`;
+
+  // En Node runtime, el File/Blob funciona con FormData
+  formData.append("document", imageFile, fileName);
+
+  const tgResp = await fetch(
+    `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`,
+    { method: "POST", body: formData }
+  );
+
+  return await tgResp.json();
 }
 
 async function saveToMongoDB(data: {
@@ -333,7 +331,20 @@ export async function POST(request: NextRequest) {
 
     // Obtener la imagen si existe (el frontend lo envía como "proofFile")
     const proofImage = formData.get("proofFile") as File | null;
+    if (!proofImage || (proofImage instanceof File && proofImage.size === 0)) {
+      return NextResponse.json(
+        { error: "Ingrese su comprobante de pago" },
+        { status: 400 }
+      );
+    }
 
+    // (Opcional) validar que sea imagen
+    if (proofImage instanceof File && !proofImage.type.startsWith("image/")) {
+      return NextResponse.json(
+        { error: "El comprobante debe ser una imagen (JPG/PNG/etc.)" },
+        { status: 400 }
+      );
+    }
     // Validaciones mínimas
     if (!data.bank || !data.referenceNumber) {
       return NextResponse.json(
@@ -403,50 +414,58 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3) EMAIL (HTML + TEXT)
-    const html = buildTicketsEmailHTML({
-      fullName: data.fullName,
-      quantity: data.quantity,
-      totalAmount: data.totalAmount,
-      bank: data.bank,
-      referenceNumber: data.referenceNumber,
-      ticketPrice: data.ticketPrice,
-      tickets: data.assignedTickets,
-      transactionDate: data.transactionDate,
-      transactionId: transactionId.toString(),
-    });
-
-    const text = buildTicketsEmailText({
-      fullName: data.fullName,
-      quantity: data.quantity,
-      totalAmount: data.totalAmount,
-      bank: data.bank,
-      referenceNumber: data.referenceNumber,
-      ticketPrice: data.ticketPrice,
-      tickets: data.assignedTickets,
-      transactionDate: data.transactionDate,
-      transactionId: transactionId.toString(),
-    });
+    let emailStatus: "sent" | "skipped" | "failed" = "skipped";
+    let emailError: string | null = null;
 
     try {
-      await sendTicketsEmail(
-        data.email,
-        "✅ Confirmación - Tus números de la suerte",
-        html,
-        text
-      );
-      console.log("✅ Email enviado correctamente");
+      // Si no hay email o está vacío, lo saltas
+      if (data.email && String(data.email).trim().length > 0) {
+        const html = buildTicketsEmailHTML({
+          fullName: data.fullName,
+          quantity: data.quantity,
+          totalAmount: data.totalAmount,
+          bank: data.bank,
+          referenceNumber: data.referenceNumber,
+          ticketPrice: data.ticketPrice,
+          tickets: data.assignedTickets,
+          transactionDate: data.transactionDate,
+          transactionId: transactionId.toString(),
+        });
+
+        const text = buildTicketsEmailText({
+          fullName: data.fullName,
+          quantity: data.quantity,
+          totalAmount: data.totalAmount,
+          bank: data.bank,
+          referenceNumber: data.referenceNumber,
+          ticketPrice: data.ticketPrice,
+          tickets: data.assignedTickets,
+          transactionDate: data.transactionDate,
+          transactionId: transactionId.toString(),
+        });
+
+        await sendTicketsEmail(
+          String(data.email).trim(),
+          "✅ Confirmación - Tus números de la suerte",
+          html,
+          text
+        );
+
+        emailStatus = "sent";
+        console.log("✅ Email enviado correctamente");
+      } else {
+        emailStatus = "skipped";
+        console.log("⚠️ Email omitido: no hay destinatario");
+      }
     } catch (e: any) {
-      console.error("❌ FALLÓ EMAIL:", e?.message, e);
-      return NextResponse.json(
-        { error: "Falló el envío de email", details: e?.message || String(e) },
-        { status: 502 }
-      );
+      emailStatus = "failed";
+      emailError = e?.message || String(e);
+      console.error("❌ FALLÓ EMAIL (pero continúo):", emailError, e);
     }
 
     return NextResponse.json({
       success: true,
-      message: "Pago registrado en DB, Telegram OK, Email OK",
+      message: "Pago registrado en DB, Telegram OK, Email opcional",
       data: {
         transactionId: transactionId.toString(),
         fullName: data.fullName,
@@ -455,6 +474,8 @@ export async function POST(request: NextRequest) {
         referenceNumber: data.referenceNumber,
         ticketNumbers: data.assignedTickets,
         ticketCount: data.assignedTickets.length,
+        emailStatus, // "sent" | "skipped" | "failed"
+        emailError, // string | null
         timestamp: new Date().toISOString(),
       },
     });
