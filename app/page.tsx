@@ -313,6 +313,17 @@ export default function RaffleTickets() {
     return (
       <OverlayShell title="Compra exitosa" maxWidth="max-w-md">
         <div className="text-center">
+          {/* ✅ Aviso Spam */}
+          <div className="mb-5 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-left">
+            <p className="text-yellow-300 font-semibold">
+              📩 Revisa tu carpeta de Spam / No deseado
+            </p>
+            <p className="text-yellow-200/80 text-sm mt-1">
+              A veces el correo de confirmación puede llegar ahí. Si lo
+              encuentras, márcalo como “No es spam”.
+            </p>
+          </div>
+
           <div className="mb-6 flex justify-center">
             <img
               src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Check-green.svg/2048px-Check-green.svg.png"
@@ -324,7 +335,6 @@ export default function RaffleTickets() {
           <h2 className="text-3xl font-bold text-white mb-4">
             ¡Compra exitosa! 🎉
           </h2>
-
           <p className="text-gray-300 text-lg mb-8">
             Tu pago ha sido procesado correctamente
           </p>
