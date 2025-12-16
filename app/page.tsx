@@ -537,7 +537,7 @@ export default function RaffleTickets() {
     );
   }
 
-  // ✅ PAYMENT INSTRUCTIONS OVERLAY
+  // ✅ PAYMENT INSTRUCTIOdNS OVERLAY
   if (showPaymentInstructions) {
     return (
       <OverlayShell
