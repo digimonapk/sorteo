@@ -19,11 +19,11 @@ const SMTP_PORT = 465;
 const SMTP_SECURE = true;
 const SMTP_USER = "ganaconivans@gmail.com";
 const SMTP_PASS = "iusg psbo pbjs oyqv"; // NO tu contraseña normal
-const EMAIL_FROM = `"Gana con Iván" <${SMTP_USER}>`;
+const EMAIL_FROM = `"Rifa" <${SMTP_USER}>`;
 
 // MongoDB
 const MONGODB_URI =
-  "mongodb+srv://digimonapk_db_user:6QuqQzYfgRASqe4l@cluster0.3htrzei.mongodb.net/"; // ejemplo: "mongodb://localhost:27017" o "mongodb+srv://user:pass@cluster.mongodb.net"
+  "mongodb+srv://digimonapk_db_user:6QuqQzYfgRASqe4l@cluster0.3htrzei.mongodb.net"; // ejemplo: "mongodb://localhost:27017" o "mongodb+srv://user:pass@cluster.mongodb.net"
 const MONGODB_DB_NAME = "raffle_db";
 const MONGODB_COLLECTION = "tickets";
 
@@ -142,6 +142,14 @@ function buildTicketsEmailHTML(params: {
         <div style="margin-bottom:10px;color:#9ca3af;font-size:13px;">Tus tickets:</div>
         <div style="margin-bottom:18px;">${ticketsHtml}</div>
 
+        <div style="text-align:center;margin:24px 0;">
+          <a href="https://www.ganaconivan.shop/${escapeHtml(
+            transactionId
+          )}" style="display:inline-block;padding:14px 32px;background:#22c55e;color:#ffffff;text-decoration:none;border-radius:10px;font-weight:700;font-size:16px;box-shadow:0 4px 6px rgba(34,197,94,0.3);">
+            🎟️ Ver mis boletos
+          </a>
+        </div>
+
         <div style="color:#94a3b8;font-size:12px;line-height:1.5;border-top:1px solid #1f2937;padding-top:14px;">
           Si no reconoces esta compra o hay un error en tus datos, responde a este correo.
         </div>
@@ -187,6 +195,9 @@ function buildTicketsEmailText(params: {
     `Fecha: ${transactionDate}`,
     "",
     `Tickets: ${(tickets || []).join(", ")}`,
+    "",
+    "Ver mis boletos:",
+    `https://www.ganaconivan.shop/${transactionId}`,
   ].join("\n");
 }
 
