@@ -575,18 +575,18 @@ export default function RaffleTickets() {
           <div className="flex justify-between py-3 border-b border-slate-700">
             <span className="text-gray-400">Banco</span>
             <span className="text-white font-medium text-right max-w-xs">
-              Banco Provincial
+              Banco de Venezuela
             </span>
           </div>
 
           <div className="flex justify-between py-3 border-b border-slate-700">
             <span className="text-gray-400">Teléfono</span>
-            <span className="text-white font-medium">04145201750</span>
+            <span className="text-white font-medium">04161080839</span>
           </div>
 
           <div className="flex justify-between py-3 border-b border-slate-700">
             <span className="text-gray-400">Cédula</span>
-            <span className="text-white font-medium">7380191</span>
+            <span className="text-white font-medium">32488321</span>
           </div>
 
           <div className="flex justify-between py-3">
