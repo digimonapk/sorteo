@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Minus, Plus, X, Gift, ArrowLeft, Upload } from "lucide-react";
+import { Minus, Plus, X, Gift, ArrowLeft, Upload, Search } from "lucide-react";
 
 type PaymentReportData = {
   bank: string;
@@ -11,6 +11,12 @@ type PaymentReportData = {
   phone: string;
   phoneCode: string;
   proofFile: File | null;
+};
+
+type PurchasedTicket = {
+  ticketNumber: number;
+  purchaseDate: string;
+  status: string;
 };
 
 function OverlayShell({
@@ -64,9 +70,19 @@ export default function RaffleTickets() {
   const [showPaymentInstructions, setShowPaymentInstructions] = useState(false);
   const [showPaymentReport, setShowPaymentReport] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showCheckTickets, setShowCheckTickets] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [assignedNumbers, setAssignedNumbers] = useState<number[]>([]);
+  const [checkTicketsData, setCheckTicketsData] = useState({
+    countryCode: "V",
+    idNumber: "",
+  });
+  const [purchasedTickets, setPurchasedTickets] = useState<PurchasedTicket[]>(
+    []
+  );
+  const [isLoadingTickets, setIsLoadingTickets] = useState(false);
+  const [ticketsSearched, setTicketsSearched] = useState(false);
 
   const ticketPrice = 219.0;
   const quickOptions = [7, 10, 25, 50, 100, 250];
@@ -306,7 +322,153 @@ export default function RaffleTickets() {
     });
   };
 
+  const handleCheckTicketsChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    setCheckTicketsData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  const handleSearchTickets = async () => {
+    if (!checkTicketsData.idNumber) {
+      alert("Por favor ingresa tu número de cédula");
+      return;
+    }
+
+    setIsLoadingTickets(true);
+    setTicketsSearched(false);
+
+    try {
+      // Llamar a la API para obtener los tickets
+      const response = await fetch(
+        `/api/check-tickets?countryCode=${checkTicketsData.countryCode}&idNumber=${checkTicketsData.idNumber}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Error al buscar los tickets");
+      }
+
+      const result = await response.json();
+      setPurchasedTickets(result.tickets || []);
+      setTicketsSearched(true);
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Hubo un error al buscar tus tickets. Por favor intenta de nuevo.");
+      setPurchasedTickets([]);
+      setTicketsSearched(true);
+    } finally {
+      setIsLoadingTickets(false);
+    }
+  };
+
   const totalAmount = (ticketPrice * selectedQuantity).toFixed(2);
+
+  // ✅ CHECK TICKETS OVERLAY
+  if (showCheckTickets) {
+    return (
+      <OverlayShell
+        title="Comprobar mis tickets"
+        onClose={() => {
+          setShowCheckTickets(false);
+          setTicketsSearched(false);
+          setPurchasedTickets([]);
+          setCheckTicketsData({ countryCode: "V", idNumber: "" });
+        }}
+        maxWidth="max-w-lg"
+      >
+        <div className="space-y-6">
+          <p className="text-gray-300">
+            Ingresa tu cédula para ver todos tus tickets comprados
+          </p>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Número de cédula
+            </label>
+            <div className="flex gap-2">
+              <select
+                name="countryCode"
+                value={checkTicketsData.countryCode}
+                onChange={handleCheckTicketsChange}
+                className="px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="V">V</option>
+                <option value="E">E</option>
+                <option value="J">J</option>
+                <option value="P">P</option>
+              </select>
+              <input
+                type="text"
+                name="idNumber"
+                value={checkTicketsData.idNumber}
+                onChange={handleCheckTicketsChange}
+                placeholder="Escribe tu cédula"
+                className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={handleSearchTickets}
+            disabled={isLoadingTickets}
+            className="w-full py-4 bg-green-500 hover:bg-green-600 text-white text-lg font-bold rounded-lg transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            <Search size={20} />
+            {isLoadingTickets ? "Buscando..." : "Buscar mis tickets"}
+          </button>
+
+          {ticketsSearched && (
+            <div className="mt-6">
+              {purchasedTickets.length > 0 ? (
+                <>
+                  <h3 className="text-white text-lg font-semibold mb-4">
+                    Tus tickets ({purchasedTickets.length})
+                  </h3>
+                  <div className="max-h-96 overflow-y-auto space-y-3">
+                    {purchasedTickets.map((ticket, index) => (
+                      <div
+                        key={index}
+                        className="bg-slate-700 border border-slate-600 rounded-lg p-4"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-2xl font-bold text-green-400">
+                            {ticket.ticketNumber}
+                          </span>
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                              ticket.status === "Activo"
+                                ? "bg-green-500/20 text-green-400"
+                                : "bg-gray-500/20 text-gray-400"
+                            }`}
+                          >
+                            {ticket.status}
+                          </span>
+                        </div>
+                        <p className="text-gray-400 text-sm">
+                          Comprado: {ticket.purchaseDate}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="text-gray-400 text-lg mb-2">
+                    No se encontraron tickets
+                  </div>
+                  <p className="text-gray-500 text-sm">
+                    No hay tickets asociados a esta cédula
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </OverlayShell>
+    );
+  }
 
   // ✅ SUCCESS OVERLAY
   if (showSuccess) {
@@ -320,7 +482,7 @@ export default function RaffleTickets() {
             </p>
             <p className="text-yellow-200/80 text-sm mt-1">
               A veces el correo de confirmación puede llegar ahí. Si lo
-              encuentras, márcalo como “No es spam”.
+              encuentras, márcalo como "No es spam".
             </p>
           </div>
 
@@ -559,7 +721,7 @@ export default function RaffleTickets() {
     );
   }
 
-  // ✅ PAYMENT INSTRUCTIOdNS OVERLAY
+  // ✅ PAYMENT INSTRUCTIONS OVERLAY
   if (showPaymentInstructions) {
     return (
       <OverlayShell
@@ -774,9 +936,18 @@ export default function RaffleTickets() {
           <div className="flex items-center gap-3">
             <img src="/logo.svg" alt="Logo" className="w-12 h-12 rounded-lg" />
           </div>
-          <button className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">
-            Telegram
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowCheckTickets(true)}
+              className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors flex items-center gap-2"
+            >
+              <Search size={18} />
+              Comprobar tickets
+            </button>
+            <button className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">
+              Telegram
+            </button>
+          </div>
         </div>
 
         <div className="bg-slate-800 rounded-2xl overflow-hidden shadow-2xl mb-8">
