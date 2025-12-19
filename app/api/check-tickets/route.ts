@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
           hour: "2-digit",
           minute: "2-digit",
         }),
-        status: purchase.status === "confirmed" ? "Confirmado" : "Pendiente",
+        status: "Confirmado",
         transactionId: purchase._id.toString(),
         bank: purchase.bank,
         referenceNumber: purchase.referenceNumber,
