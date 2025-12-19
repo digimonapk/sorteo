@@ -1052,7 +1052,10 @@ export default function RaffleTickets() {
                 Premios
               </button>
 
-              <button className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-green-400 rounded-lg flex items-center justify-center gap-2 transition-colors">
+              <button
+                onClick={() => setShowCheckTickets(true)}
+                className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-green-400 rounded-lg flex items-center justify-center gap-2 transition-colors"
+              >
                 <svg
                   className="w-5 h-5"
                   fill="currentColor"
