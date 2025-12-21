@@ -955,7 +955,7 @@ export default function RaffleTickets() {
             <img
               src="1.jpeg"
               alt="Raffle Prize"
-              className="w-full h-80 object-cover"
+              className="w-full h-full object-cover"
             />
             <div className="absolute bottom-4 left-4 bg-green-500 px-4 py-2 rounded-lg">
               <span className="text-white font-semibold">Participa ahora</span>
