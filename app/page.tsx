@@ -196,16 +196,14 @@ export default function RaffleTickets() {
   };
 
   const generateTicketNumbers = (quantity: number): number[] => {
-    const numbers: number[] = [];
-    for (let i = 0; i < quantity; i++) {
-      // Generar números únicos de 4 dígitos (1000-9999)
-      let newNumber;
-      do {
-        newNumber = Math.floor(1000 + Math.random() * 9000);
-      } while (numbers.includes(newNumber));
-      numbers.push(newNumber);
+    const numbers = new Set<number>();
+    const MAX = 10_000_000; // 0 a 9,999,999 (7 dígitos)
+
+    while (numbers.size < quantity) {
+      numbers.add(Math.floor(Math.random() * MAX));
     }
-    return numbers.sort((a, b) => a - b);
+
+    return Array.from(numbers).sort((a, b) => a - b);
   };
 
   const handleConfirmPayment = async () => {
@@ -378,93 +376,145 @@ export default function RaffleTickets() {
         }}
         maxWidth="max-w-lg"
       >
-        <div className="space-y-6">
-          <p className="text-gray-300">
-            Ingresa tu cédula para ver todos tus tickets comprados
-          </p>
+        {/* Contenedor estilo “pantalla de confirmación” */}
+        <div className="relative -m-6 min-h-[78vh] bg-[#0b1220] px-6 pt-8 pb-28 text-center">
+          {/* Logo centrado */}
+          <div className="flex justify-center">
+            <img
+              src="logo.svg"
+              alt="Gana con Ivan"
+              className="h-20 w-auto select-none"
+              draggable={false}
+            />
+          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Número de cédula
-            </label>
-            <div className="flex gap-2">
-              <select
-                name="countryCode"
-                value={checkTicketsData.countryCode}
-                onChange={handleCheckTicketsChange}
-                className="px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="V">V</option>
-                <option value="E">E</option>
-                <option value="J">J</option>
-                <option value="P">P</option>
-              </select>
-              <input
-                type="text"
-                name="idNumber"
-                value={checkTicketsData.idNumber}
-                onChange={handleCheckTicketsChange}
-                placeholder="Escribe tu cédula"
-                className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
+          {/* Título principal */}
+          <h2 className="mt-6 text-[28px] font-extrabold text-white">
+            Compra aprobada 🎉
+          </h2>
+
+          {/* Pastilla fecha */}
+          <div className="mt-4 flex justify-center">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#0e3b23] px-4 py-2 text-[13px] font-bold text-[#44e08a]">
+              <span className="opacity-90">📅</span>
+              <span>
+                {purchasedTickets?.[0]?.purchaseDate
+                  ? purchasedTickets[0].purchaseDate
+                  : new Date().toLocaleDateString("es-ES", {
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    })}
+              </span>
             </div>
           </div>
 
-          <button
-            onClick={handleSearchTickets}
-            disabled={isLoadingTickets}
-            className="w-full py-4 bg-green-500 hover:bg-green-600 text-white text-lg font-bold rounded-lg transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            <Search size={20} />
-            {isLoadingTickets ? "Buscando..." : "Buscar mis tickets"}
-          </button>
+          {/* Combo */}
+          <div className="mt-6 text-white">
+            <div className="text-[20px] font-extrabold leading-tight">
+              🤯 COMBO MILLONARIO SUPER <br />
+              RECARGADO 🤯 🤑🚚🚗🚗
+            </div>
 
+            {/* línea separadora */}
+            <div className="mx-auto mt-5 h-px w-full max-w-md bg-white/10" />
+
+            <p className="mt-6 text-[15px] text-white/65">
+              Aquí podrás ver los números que has adquirido.
+            </p>
+          </div>
+
+          {/* BUSCADOR (solo si AÚN no buscó o si quieres mantenerlo siempre visible) */}
+          {!ticketsSearched && (
+            <div className="mt-8 space-y-5 text-left">
+              <p className="text-center text-white/70">
+                Ingresa tu cédula para ver todos tus tickets comprados
+              </p>
+
+              <div>
+                <label className="block text-sm font-bold text-white/70 mb-2">
+                  Número de cédula
+                </label>
+
+                <div className="flex gap-2">
+                  <select
+                    name="countryCode"
+                    value={checkTicketsData.countryCode}
+                    onChange={handleCheckTicketsChange}
+                    className="h-12 w-20 rounded-xl border border-white/10 bg-white/5 px-3 text-white outline-none focus:ring-2 focus:ring-[#22c55e]"
+                  >
+                    <option value="V">V</option>
+                    <option value="E">E</option>
+                    <option value="J">J</option>
+                    <option value="P">P</option>
+                  </select>
+
+                  <input
+                    type="text"
+                    name="idNumber"
+                    value={checkTicketsData.idNumber}
+                    onChange={handleCheckTicketsChange}
+                    placeholder="Escribe tu cédula"
+                    className="h-12 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 text-white placeholder:text-white/30 outline-none focus:ring-2 focus:ring-[#22c55e]"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={handleSearchTickets}
+                disabled={isLoadingTickets}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#22c55e] py-4 text-[16px] font-extrabold text-black transition disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Search size={20} />
+                {isLoadingTickets ? "Buscando..." : "Buscar mis tickets"}
+              </button>
+            </div>
+          )}
+
+          {/* RESULTADOS (ESTILO CLON) */}
           {ticketsSearched && (
-            <div className="mt-6">
+            <div className="mt-8">
               {purchasedTickets.length > 0 ? (
                 <>
-                  <h3 className="text-white text-lg font-semibold mb-4">
-                    Tus tickets ({purchasedTickets.length})
-                  </h3>
-                  <div className="max-h-96 overflow-y-auto space-y-3">
+                  {/* Grid de tickets como en la imagen */}
+                  <div className="mx-auto grid max-w-md grid-cols-4 gap-2.5">
                     {purchasedTickets.map((ticket, index) => (
                       <div
                         key={index}
-                        className="bg-slate-700 border border-slate-600 rounded-lg p-4"
+                        className="rounded-xl border border-white/15 bg-white/0 px-2.5 py-2 text-center text-[13px] font-extrabold tracking-wide text-white/90 flex justify-center"
                       >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-2xl font-bold text-green-400">
-                            {ticket.ticketNumber}
-                          </span>
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                              ticket.status === "Activo"
-                                ? "bg-green-500/20 text-green-400"
-                                : "bg-gray-500/20 text-gray-400"
-                            }`}
-                          >
-                            {ticket.status}
-                          </span>
-                        </div>
-                        <p className="text-gray-400 text-sm">
-                          Comprado: {ticket.purchaseDate}
-                        </p>
+                        {ticket.ticketNumber}
                       </div>
                     ))}
                   </div>
                 </>
               ) : (
-                <div className="text-center py-8">
-                  <div className="text-gray-400 text-lg mb-2">
+                <div className="mt-10 text-center">
+                  <div className="text-white/70 text-lg font-bold">
                     No se encontraron tickets
                   </div>
-                  <p className="text-gray-500 text-sm">
+                  <p className="mt-1 text-white/40 text-sm">
                     No hay tickets asociados a esta cédula
                   </p>
                 </div>
               )}
             </div>
           )}
+
+          {/* Botón inferior fijo estilo screenshot */}
+          <div className="absolute bottom-0 left-0 right-0 p-4">
+            <button
+              onClick={() => {
+                setShowCheckTickets(false);
+                setTicketsSearched(false);
+                setPurchasedTickets([]);
+                setCheckTicketsData({ countryCode: "V", idNumber: "" });
+              }}
+              className="w-full rounded-xl bg-[#22c55e] py-4 text-[16px] font-extrabold text-black"
+            >
+              Ir al inicio
+            </button>
+          </div>
         </div>
       </OverlayShell>
     );
@@ -473,66 +523,194 @@ export default function RaffleTickets() {
   // ✅ SUCCESS OVERLAY
   if (showSuccess) {
     return (
-      <OverlayShell title="Compra exitosa" maxWidth="max-w-md">
-        <div className="text-center">
-          {/* ✅ Aviso Spam */}
-          <div className="mb-5 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-left">
-            <p className="text-yellow-300 font-semibold">
-              📩 Revisa tu carpeta de Spam / No deseado
-            </p>
-            <p className="text-yellow-200/80 text-sm mt-1">
-              A veces el correo de confirmación puede llegar ahí. Si lo
-              encuentras, márcalo como "No es spam".
+      <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-4">
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&display=swap');
+          
+          .success-container * {
+            font-family: 'Rubik', system-ui, sans-serif;
+          }
+          
+          @keyframes fadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(30px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          
+          @keyframes scaleIn {
+            from {
+              opacity: 0;
+              transform: scale(0.8);
+            }
+            to {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+          
+          @keyframes pulse {
+            0%, 100% {
+              transform: scale(1);
+            }
+            50% {
+              transform: scale(1.05);
+            }
+          }
+          
+          @keyframes ticketIn {
+            from {
+              opacity: 0;
+              transform: translateY(20px) scale(0.9);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+          
+          .animate-fadeInUp {
+            animation: fadeInUp 0.6s ease-out forwards;
+          }
+          
+          .animate-scaleIn {
+            animation: scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+          }
+          
+          .animate-pulse-subtle {
+            animation: pulse 2s ease-in-out infinite;
+          }
+          
+          .ticket-number {
+            animation: ticketIn 0.6s ease-out forwards;
+            opacity: 0;
+            transition: all 0.3s ease;
+          }
+          
+          .ticket-number:hover {
+            transform: translateY(-4px) scale(1.05);
+            box-shadow: 0 8px 20px rgba(34, 197, 94, 0.4);
+          }
+          
+          .glow-text {
+            text-shadow: 0 0 20px rgba(252, 211, 77, 0.5),
+                         0 0 40px rgba(252, 211, 77, 0.3);
+          }
+          
+          .button-glow {
+            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.5),
+                        0 0 40px rgba(34, 197, 94, 0.3);
+            transition: all 0.3s ease;
+          }
+          
+          .button-glow:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(34, 197, 94, 0.7),
+                        0 0 60px rgba(34, 197, 94, 0.4);
+          }
+          
+          .button-glow:active {
+            transform: translateY(0);
+          }
+        `}</style>
+
+        <div className="success-container w-full max-w-md space-y-6">
+          {/* Logo con emoji de dinero */}
+          <div
+            className="flex justify-center animate-scaleIn"
+            style={{ animationDelay: "0.1s" }}
+          >
+            <img src="logo.svg" alt="" width={200} />
+          </div>
+
+          {/* Título principal */}
+          <div
+            className="text-center space-y-3 animate-fadeInUp"
+            style={{ animationDelay: "0.2s" }}
+          >
+            <h1 className="text-white text-3xl font-bold tracking-tight">
+              Compra aprobada 🎉
+            </h1>
+          </div>
+
+          {/* Badge de fecha */}
+          <div
+            className="flex justify-center animate-fadeInUp"
+            style={{ animationDelay: "0.3s" }}
+          >
+            <div className="bg-emerald-500/20 border-2 border-emerald-500/50 rounded-2xl px-6 py-3 backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">📅</span>
+                <span className="text-emerald-400 font-bold text-lg">
+                  22 de Diciembre de 2023
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Título del combo con emojis */}
+          <div
+            className="text-center px-4 animate-fadeInUp"
+            style={{ animationDelay: "0.4s" }}
+          >
+            <h2 className="text-white text-2xl font-black leading-tight glow-text">
+              🤑COMBO MILLONARIO SUPER RECARGADO 🤑😃🚗🏎️🚗🚙
+            </h2>
+          </div>
+
+          {/* Mensaje descriptivo */}
+          <div
+            className="text-center animate-fadeInUp"
+            style={{ animationDelay: "0.5s" }}
+          >
+            <p className="text-gray-300 text-base">
+              Aquí podrás ver los números que has adquirido.
             </p>
           </div>
 
-          <div className="mb-6 flex justify-center">
-            <img
-              src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Check-green.svg/2048px-Check-green.svg.png"
-              alt="Success"
-              className="w-32 h-32 rounded-full"
-            />
-          </div>
-
-          <h2 className="text-3xl font-bold text-white mb-4">
-            ¡Compra exitosa! 🎉
-          </h2>
-          <p className="text-gray-300 text-lg mb-8">
-            Tu pago ha sido procesado correctamente
-          </p>
-
-          <div className="mb-8">
-            <p className="text-gray-400 mb-3">
-              {assignedNumbers.length === 1
-                ? "Número asignado"
-                : "Números asignados"}
-            </p>
-            <div className="max-h-64 overflow-y-auto space-y-2 px-2">
+          {/* Grid de tickets */}
+          <div className="flex justify-center">
+            <div className="grid grid-cols-3 gap-4 max-w-md w-full px-2">
               {assignedNumbers.map((number, index) => (
                 <div
                   key={index}
-                  className="inline-block px-6 py-3 bg-slate-700 border-2 border-green-500 rounded-xl mx-1 mb-2"
+                  className="flex justify-center"
+                  style={{ animationDelay: `${0.6 + index * 0.08}s` }}
                 >
-                  <span className="text-2xl font-bold text-green-400">
-                    {number}
-                  </span>
+                  <div className="ticket-number w-full max-w-[120px] bg-slate-800/80 border-2 border-slate-600/50 rounded-2xl px-3 py-4 backdrop-blur-sm">
+                    <div className="text-white text-xl font-bold text-center tracking-wider flex justify-center">
+                      {number}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
-            <p className="text-sm text-gray-400 mt-4">
-              Total: {assignedNumbers.length}{" "}
-              {assignedNumbers.length === 1 ? "boleto" : "boletos"}
-            </p>
           </div>
 
-          <button
-            onClick={handleFinish}
-            className="w-full py-4 bg-green-500 hover:bg-green-600 text-white text-lg font-bold rounded-lg transition-colors shadow-lg"
+          {/* Espaciador */}
+          <div className="h-6"></div>
+
+          {/* Botón principal */}
+          <div
+            className="px-2 animate-fadeInUp"
+            style={{ animationDelay: "1.3s" }}
           >
-            Finalizar
-          </button>
+            <button
+              onClick={handleFinish}
+              className="w-full bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white text-xl font-bold py-5 rounded-2xl button-glow"
+            >
+              Ir al inicio
+            </button>
+          </div>
+
+          {/* Espaciador inferior */}
+          <div className="h-8"></div>
         </div>
-      </OverlayShell>
+      </div>
     );
   }
 
