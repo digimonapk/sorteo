@@ -646,7 +646,7 @@ export default function RaffleTickets() {
               <div className="flex items-center gap-2">
                 <span className="text-2xl">📅</span>
                 <span className="text-emerald-400 font-bold text-lg">
-                  22 de Diciembre de 2023
+                  de Diciembre de 2023
                 </span>
               </div>
             </div>
@@ -1158,7 +1158,7 @@ export default function RaffleTickets() {
                     clipRule="evenodd"
                   />
                 </svg>
-                <span className="font-semibold">22 Diciembre 2025</span>
+                <span className="font-semibold">25 Diciembre 2025</span>
               </div>
               <div className="text-right">
                 <div className="text-gray-400 text-sm">Boleto</div>
