@@ -644,9 +644,8 @@ export default function RaffleTickets() {
           >
             <div className="bg-emerald-500/20 border-2 border-emerald-500/50 rounded-2xl px-6 py-3 backdrop-blur-sm">
               <div className="flex items-center gap-2">
-                <span className="text-2xl">📅</span>
                 <span className="text-emerald-400 font-bold text-lg">
-                  de Diciembre de 2023
+                  25 de Diciembre de 2025
                 </span>
               </div>
             </div>
