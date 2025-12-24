@@ -197,7 +197,7 @@ export default function RaffleTickets() {
 
   const generateTicketNumbers = (quantity: number): number[] => {
     const numbers = new Set<number>();
-    const MAX = 10_000_000; // 0 a 9,999,999 (7 dígitos)
+    const MAX = 1_000_000; // 0 a 9,999,999 (7 dígitos)
 
     while (numbers.size < quantity) {
       numbers.add(Math.floor(Math.random() * MAX));
