@@ -1141,7 +1141,7 @@ export default function RaffleTickets() {
 
           <div className="p-6">
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-4 flex items-center gap-2">
-              🤑 COMBO MILLONARIO SUPER RECARGADO 🤑 🚗 🚙 🏠 🏠
+              🤑 COMBO MILLONARIO SUPER RECARGADO #3 🤑 🚗 🚙 🏠 🏠
             </h1>
 
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-700">
