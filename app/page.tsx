@@ -1159,8 +1159,15 @@ export default function RaffleTickets() {
                 </svg>
                 <span className="font-semibold">30 Diciembre 2025</span>
               </div>
-              <div className="text-right">
+              <div className="text-right flex flex-col items-end gap-1">
+                <img
+                  src="/triple.png"
+                  alt="Triple Táchira"
+                  className="" width={100}
+                />
+
                 <div className="text-gray-400 text-sm">Boleto</div>
+
                 <div className="text-white text-xl font-bold">
                   Bs. {ticketPrice.toFixed(2)}
                 </div>
