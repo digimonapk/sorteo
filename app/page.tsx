@@ -920,7 +920,11 @@ export default function RaffleTickets() {
 
           <div className="flex justify-between py-3 border-b border-slate-700">
             <span className="text-gray-400">Teléfono</span>
+<<<<<<< HEAD
             <span className="text-white font-medium">04124164671</span>
+=======
+            <span className="text-white font-medium">04247861979</span>
+>>>>>>> 3eaf7e1 (holaas)
           </div>
 
           <div className="flex justify-between py-3 border-b border-slate-700">
