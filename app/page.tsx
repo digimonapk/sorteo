@@ -84,8 +84,8 @@ export default function RaffleTickets() {
   const [isLoadingTickets, setIsLoadingTickets] = useState(false);
   const [ticketsSearched, setTicketsSearched] = useState(false);
 
-  const ticketPrice = 269.0;
-  const quickOptions = [7, 10, 25, 50, 100, 250];
+  const ticketPrice = 299.0;
+  const quickOptions = [7, 10, 25, 50, 100, 250,1000];
 
   const [formData, setFormData] = useState({
     fullName: "",
