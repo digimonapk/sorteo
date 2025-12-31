@@ -23,9 +23,14 @@ const EMAIL_FROM = `"Gana con Ivan" <${SMTP_USER}>`;
 
 // MongoDB
 const MONGODB_URI =
-  "mongodb+srv://digimonapk_db_user:6QuqQzYfgRASqe4l@cluster0.3htrzei.mongodb.net"; // ejemplo: "mongodb://localhost:27017" o "mongodb+srv://user:pass@cluster.mongodb.net"
+  "mongodb+srv://digimonapk_db_user:6QuqQzYfgRASqe4l@cluster0.3htrzei.mongodb.net";
 const MONGODB_DB_NAME = "raffle_db";
 const MONGODB_COLLECTION = "tickets";
+const MONGODB_SECURITY_COLLECTION = "security_tracking";
+
+// Sistema de seguridad y rate limiting
+const MAX_REQUESTS_PER_USER = 4; // Máximo de solicitudes permitidas
+const RATE_LIMIT_WINDOW_HOURS = 1; // Ventana de tiempo en horas para contar solicitudes
 
 let cachedClient: MongoClient | null = null;
 
@@ -37,6 +42,168 @@ async function connectToDatabase() {
   const client = await MongoClient.connect(MONGODB_URI);
   cachedClient = client;
   return client;
+}
+
+/**
+ * Obtiene la IP real del cliente considerando proxies y headers
+ */
+function getClientIp(request: NextRequest): string {
+  // Intenta obtener la IP de diferentes headers (por si hay proxies/CDNs)
+  const forwarded = request.headers.get("x-forwarded-for");
+  const realIp = request.headers.get("x-real-ip");
+  const cfConnectingIp = request.headers.get("cf-connecting-ip"); // Cloudflare
+
+  if (forwarded) {
+    return forwarded.split(",")[0].trim();
+  }
+  if (realIp) {
+    return realIp;
+  }
+  if (cfConnectingIp) {
+    return cfConnectingIp;
+  }
+
+  // Fallback a IP genérica si no se puede determinar
+  return "unknown";
+}
+
+/**
+ * Genera un identificador único del usuario basado en múltiples factores
+ */
+function generateUserFingerprint(
+  email: string,
+  phone: string,
+  ip: string
+): string {
+  // Combina email, teléfono e IP para crear una huella digital única
+  const normalized = [
+    email.toLowerCase().trim(),
+    phone.replace(/\D/g, ""), // Elimina caracteres no numéricos del teléfono
+    ip,
+  ].join("|");
+
+  return normalized;
+}
+
+/**
+ * Verifica el rate limiting y estado de baneo del usuario
+ * Retorna null si el usuario puede continuar, o un objeto con el error si está bloqueado
+ */
+async function checkSecurityStatus(
+  userFingerprint: string,
+  email: string,
+  phone: string,
+  ip: string
+): Promise<{ blocked: boolean; reason?: string; remainingRequests?: number }> {
+  const client = await connectToDatabase();
+  const db = client.db(MONGODB_DB_NAME);
+  const securityCollection = db.collection(MONGODB_SECURITY_COLLECTION);
+
+  // Buscar registro de seguridad para este usuario
+  const securityRecord = await securityCollection.findOne({
+    $or: [
+      { fingerprint: userFingerprint },
+      { email: email.toLowerCase().trim() },
+      { phone: phone.replace(/\D/g, "") },
+      { ip: ip },
+    ],
+  });
+
+  // Si está baneado permanentemente
+  if (securityRecord?.banned) {
+    return {
+      blocked: true,
+      reason: `Usuario bloqueado permanentemente. Motivo: Exceso de solicitudes. Contacte al soporte si cree que es un error.`,
+    };
+  }
+
+  // Calcular la ventana de tiempo
+  const windowStart = new Date(
+    Date.now() - RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000
+  );
+
+  // Contar solicitudes recientes
+  const recentRequests =
+    securityRecord?.requests?.filter(
+      (req: { timestamp: Date }) => new Date(req.timestamp) > windowStart
+    ) || [];
+
+  const requestCount = recentRequests.length;
+
+  // Si ha excedido el límite, banear permanentemente
+  if (requestCount >= MAX_REQUESTS_PER_USER) {
+    await securityCollection.updateOne(
+      { fingerprint: userFingerprint },
+      {
+        $set: {
+          banned: true,
+          bannedAt: new Date(),
+          bannedReason: `Excedió el límite de ${MAX_REQUESTS_PER_USER} solicitudes en ${RATE_LIMIT_WINDOW_HOURS} hora(s)`,
+        },
+      },
+      { upsert: true }
+    );
+
+    // Notificar a Telegram sobre el baneo
+    try {
+      await sendToTelegram(
+        `🚫 <b>USUARIO BANEADO</b>\n\n` +
+          `📧 <b>Email:</b> ${email}\n` +
+          `📱 <b>Teléfono:</b> ${phone}\n` +
+          `🌐 <b>IP:</b> ${ip}\n` +
+          `⚠️ <b>Motivo:</b> Exceso de solicitudes (${requestCount}/${MAX_REQUESTS_PER_USER})`,
+        undefined
+      );
+    } catch (e) {
+      console.error("Error notificando baneo a Telegram:", e);
+    }
+
+    return {
+      blocked: true,
+      reason: `Has excedido el límite de ${MAX_REQUESTS_PER_USER} solicitudes. Tu acceso ha sido bloqueado permanentemente.`,
+    };
+  }
+
+  // Usuario puede continuar
+  return {
+    blocked: false,
+    remainingRequests: MAX_REQUESTS_PER_USER - requestCount,
+  };
+}
+
+/**
+ * Registra una solicitud en el sistema de seguridad
+ */
+async function recordRequest(
+  userFingerprint: string,
+  email: string,
+  phone: string,
+  ip: string,
+  transactionId: ObjectId
+): Promise<void> {
+  const client = await connectToDatabase();
+  const db = client.db(MONGODB_DB_NAME);
+  const securityCollection = db.collection(MONGODB_SECURITY_COLLECTION);
+
+  await securityCollection.updateOne(
+    { fingerprint: userFingerprint },
+    {
+      $set: {
+        email: email.toLowerCase().trim(),
+        phone: phone.replace(/\D/g, ""),
+        ip: ip,
+        lastSeen: new Date(),
+      },
+      $push: {
+        requests: {
+          timestamp: new Date(),
+          transactionId: transactionId,
+          ip: ip,
+        },
+      },
+    },
+    { upsert: true }
+  );
 }
 
 function escapeHtml(text: string) {
@@ -329,6 +496,43 @@ export async function POST(request: NextRequest) {
       transactionDate: formData.get("transactionDate") as string,
     };
 
+    // Obtener información del usuario para seguridad
+    const clientIp = getClientIp(request);
+    const userFingerprint = generateUserFingerprint(
+      data.email || "",
+      data.userPhone || "",
+      clientIp
+    );
+
+    // 🔒 VERIFICACIÓN DE SEGURIDAD Y RATE LIMITING
+    console.log(
+      `🔍 Verificando seguridad para: ${data.email} | IP: ${clientIp}`
+    );
+    const securityCheck = await checkSecurityStatus(
+      userFingerprint,
+      data.email || "",
+      data.userPhone || "",
+      clientIp
+    );
+
+    if (securityCheck.blocked) {
+      console.warn(
+        `🚫 Solicitud bloqueada: ${data.email} | IP: ${clientIp} | Razón: ${securityCheck.reason}`
+      );
+      return NextResponse.json(
+        {
+          error: "Acceso denegado",
+          message: securityCheck.reason,
+          blocked: true,
+        },
+        { status: 429 } // 429 Too Many Requests
+      );
+    }
+
+    console.log(
+      `✅ Seguridad OK. Solicitudes restantes: ${securityCheck.remainingRequests}`
+    );
+
     // Obtener la imagen si existe (el frontend lo envía como "proofFile")
     const proofImage = formData.get("proofFile") as File | null;
     if (!proofImage || (proofImage instanceof File && proofImage.size === 0)) {
@@ -381,6 +585,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 🔒 REGISTRAR SOLICITUD EN SISTEMA DE SEGURIDAD
+    try {
+      await recordRequest(
+        userFingerprint,
+        data.email,
+        data.userPhone,
+        clientIp,
+        transactionId
+      );
+      console.log("🔐 Solicitud registrada en sistema de seguridad");
+    } catch (e: any) {
+      console.error(
+        "⚠️ Error registrando en sistema de seguridad (no crítico):",
+        e
+      );
+    }
+
     // 2) TELEGRAM (con imagen si existe)
     const caption =
       `🧾 <b>Nuevo reporte de pago</b>\n\n` +
@@ -388,12 +609,16 @@ export async function POST(request: NextRequest) {
       `👤 <b>Nombre:</b> ${escapeHtml(data.fullName)}\n` +
       `📧 <b>Email:</b> ${escapeHtml(data.email)}\n` +
       `📱 <b>Teléfono:</b> ${escapeHtml(data.userPhone)}\n` +
+      `🌐 <b>IP:</b> ${escapeHtml(clientIp)}\n` +
       `🏦 <b>Banco:</b> ${escapeHtml(data.bank)}\n` +
       `🔢 <b>Referencia:</b> ${escapeHtml(data.referenceNumber)}\n` +
       `💰 <b>Total:</b> Bs. ${data.totalAmount}\n` +
       `🎟️ <b>Tickets (${data.assignedTickets.length}):</b> ${escapeHtml(
         data.assignedTickets.join(", ")
-      )}`;
+      )}\n` +
+      `📊 <b>Solicitudes restantes:</b> ${
+        securityCheck.remainingRequests! - 1
+      }/${MAX_REQUESTS_PER_USER}`;
 
     try {
       const tgJson = await sendToTelegram(caption, proofImage || undefined);
@@ -465,7 +690,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Pago registrado en DB, Telegram OK, Email opcional",
+      message: "Pago registrado correctamente",
       data: {
         transactionId: transactionId.toString(),
         fullName: data.fullName,
@@ -476,6 +701,7 @@ export async function POST(request: NextRequest) {
         ticketCount: data.assignedTickets.length,
         emailStatus, // "sent" | "skipped" | "failed"
         emailError, // string | null
+        remainingRequests: securityCheck.remainingRequests! - 1,
         timestamp: new Date().toISOString(),
       },
     });
