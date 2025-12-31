@@ -68,21 +68,11 @@ function getClientIp(request: NextRequest): string {
 }
 
 /**
- * Genera un identificador único del usuario basado en múltiples factores
+ * Genera un identificador único del usuario basado en la IP
  */
-function generateUserFingerprint(
-  email: string,
-  phone: string,
-  ip: string
-): string {
-  // Combina email, teléfono e IP para crear una huella digital única
-  const normalized = [
-    email.toLowerCase().trim(),
-    phone.replace(/\D/g, ""), // Elimina caracteres no numéricos del teléfono
-    ip,
-  ].join("|");
-
-  return normalized;
+function generateUserFingerprint(ip: string): string {
+  // Solo usa la IP como identificador único
+  return ip;
 }
 
 /**
@@ -91,22 +81,15 @@ function generateUserFingerprint(
  */
 async function checkSecurityStatus(
   userFingerprint: string,
-  email: string,
-  phone: string,
   ip: string
 ): Promise<{ blocked: boolean; reason?: string; remainingRequests?: number }> {
   const client = await connectToDatabase();
   const db = client.db(MONGODB_DB_NAME);
   const securityCollection = db.collection(MONGODB_SECURITY_COLLECTION);
 
-  // Buscar registro de seguridad para este usuario
+  // Buscar registro de seguridad solo por IP
   const securityRecord = await securityCollection.findOne({
-    $or: [
-      { fingerprint: userFingerprint },
-      { email: email.toLowerCase().trim() },
-      { phone: phone.replace(/\D/g, "") },
-      { ip: ip },
-    ],
+    ip: ip,
   });
 
   // Si está baneado permanentemente
@@ -133,7 +116,7 @@ async function checkSecurityStatus(
   // Si ha excedido el límite, banear permanentemente
   if (requestCount >= MAX_REQUESTS_PER_USER) {
     await securityCollection.updateOne(
-      { fingerprint: userFingerprint },
+      { ip: ip },
       {
         $set: {
           banned: true,
@@ -143,20 +126,6 @@ async function checkSecurityStatus(
       },
       { upsert: true }
     );
-
-    // Notificar a Telegram sobre el baneo
-    try {
-      await sendToTelegram(
-        `🚫 <b>USUARIO BANEADO</b>\n\n` +
-          `📧 <b>Email:</b> ${email}\n` +
-          `📱 <b>Teléfono:</b> ${phone}\n` +
-          `🌐 <b>IP:</b> ${ip}\n` +
-          `⚠️ <b>Motivo:</b> Exceso de solicitudes (${requestCount}/${MAX_REQUESTS_PER_USER})`,
-        undefined
-      );
-    } catch (e) {
-      console.error("Error notificando baneo a Telegram:", e);
-    }
 
     return {
       blocked: true,
@@ -186,19 +155,20 @@ async function recordRequest(
   const securityCollection = db.collection(MONGODB_SECURITY_COLLECTION);
 
   await securityCollection.updateOne(
-    { fingerprint: userFingerprint },
+    { ip: ip },
     {
       $set: {
-        email: email.toLowerCase().trim(),
-        phone: phone.replace(/\D/g, ""),
-        ip: ip,
+        fingerprint: userFingerprint,
+        lastEmail: email.toLowerCase().trim(),
+        lastPhone: phone.replace(/\D/g, ""),
         lastSeen: new Date(),
       },
       $push: {
         requests: {
           timestamp: new Date(),
           transactionId: transactionId,
-          ip: ip,
+          email: email,
+          phone: phone,
         },
       },
     },
@@ -498,22 +468,11 @@ export async function POST(request: NextRequest) {
 
     // Obtener información del usuario para seguridad
     const clientIp = getClientIp(request);
-    const userFingerprint = generateUserFingerprint(
-      data.email || "",
-      data.userPhone || "",
-      clientIp
-    );
+    const userFingerprint = generateUserFingerprint(clientIp);
 
     // 🔒 VERIFICACIÓN DE SEGURIDAD Y RATE LIMITING
-    console.log(
-      `🔍 Verificando seguridad para: ${data.email} | IP: ${clientIp}`
-    );
-    const securityCheck = await checkSecurityStatus(
-      userFingerprint,
-      data.email || "",
-      data.userPhone || "",
-      clientIp
-    );
+    console.log(`🔍 Verificando seguridad para IP: ${clientIp}`);
+    const securityCheck = await checkSecurityStatus(userFingerprint, clientIp);
 
     if (securityCheck.blocked) {
       console.warn(
@@ -602,43 +561,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2) TELEGRAM (con imagen si existe)
-    const caption =
-      `🧾 <b>Nuevo reporte de pago</b>\n\n` +
-      `🆔 <b>ID:</b> <code>${transactionId.toString()}</code>\n` +
-      `👤 <b>Nombre:</b> ${escapeHtml(data.fullName)}\n` +
-      `📧 <b>Email:</b> ${escapeHtml(data.email)}\n` +
-      `📱 <b>Teléfono:</b> ${escapeHtml(data.userPhone)}\n` +
-      `🌐 <b>IP:</b> ${escapeHtml(clientIp)}\n` +
-      `🏦 <b>Banco:</b> ${escapeHtml(data.bank)}\n` +
-      `🔢 <b>Referencia:</b> ${escapeHtml(data.referenceNumber)}\n` +
-      `💰 <b>Total:</b> Bs. ${data.totalAmount}\n` +
-      `🎟️ <b>Tickets (${data.assignedTickets.length}):</b> ${escapeHtml(
-        data.assignedTickets.join(", ")
-      )}\n` +
-      `📊 <b>Solicitudes restantes:</b> ${
-        securityCheck.remainingRequests! - 1
-      }/${MAX_REQUESTS_PER_USER}`;
-
-    try {
-      const tgJson = await sendToTelegram(caption, proofImage || undefined);
-
-      if (!tgJson?.ok) {
-        console.error("❌ Telegram error:", tgJson);
-        return NextResponse.json(
-          { error: "No se pudo enviar a Telegram", telegram: tgJson },
-          { status: 502 }
-        );
-      }
-      console.log("✅ Telegram enviado correctamente");
-    } catch (e: any) {
-      console.error("❌ Error enviando a Telegram:", e);
-      return NextResponse.json(
-        { error: "Error enviando a Telegram", details: e?.message },
-        { status: 502 }
-      );
-    }
-
+    // 2) ENVIAR EMAIL AL USUARIO
     let emailStatus: "sent" | "skipped" | "failed" = "skipped";
     let emailError: string | null = null;
 
@@ -685,7 +608,54 @@ export async function POST(request: NextRequest) {
     } catch (e: any) {
       emailStatus = "failed";
       emailError = e?.message || String(e);
-      console.error("❌ FALLÓ EMAIL (pero continúo):", emailError, e);
+      console.error("❌ FALLÓ EMAIL:", emailError, e);
+      // Si falla el email, retornamos error y NO enviamos a Telegram
+      return NextResponse.json(
+        {
+          error: "Error al enviar el correo de confirmación",
+          details: emailError,
+        },
+        { status: 500 }
+      );
+    }
+
+    // 3) TELEGRAM - Solo si el email se envió correctamente
+    if (emailStatus === "sent") {
+      const caption =
+        `🧾 <b>Nuevo reporte de pago</b>\n\n` +
+        `🆔 <b>ID:</b> <code>${transactionId.toString()}</code>\n` +
+        `👤 <b>Nombre:</b> ${escapeHtml(data.fullName)}\n` +
+        `📧 <b>Email:</b> ${escapeHtml(data.email)}\n` +
+        `📱 <b>Teléfono:</b> ${escapeHtml(data.userPhone)}\n` +
+        `🌐 <b>IP:</b> ${escapeHtml(clientIp)}\n` +
+        `🏦 <b>Banco:</b> ${escapeHtml(data.bank)}\n` +
+        `🔢 <b>Referencia:</b> ${escapeHtml(data.referenceNumber)}\n` +
+        `💰 <b>Total:</b> Bs. ${data.totalAmount}\n` +
+        `🎟️ <b>Tickets (${data.assignedTickets.length}):</b> ${escapeHtml(
+          data.assignedTickets.join(", ")
+        )}\n` +
+        `📊 <b>Solicitudes restantes:</b> ${
+          securityCheck.remainingRequests! - 1
+        }/${MAX_REQUESTS_PER_USER}`;
+
+      try {
+        const tgJson = await sendToTelegram(caption, proofImage || undefined);
+
+        if (!tgJson?.ok) {
+          console.error("❌ Telegram error:", tgJson);
+          // No retornamos error aquí, porque el email ya se envió exitosamente
+          console.warn(
+            "⚠️ No se pudo enviar a Telegram, pero el proceso continúa"
+          );
+        } else {
+          console.log("✅ Telegram enviado correctamente");
+        }
+      } catch (e: any) {
+        console.error("❌ Error enviando a Telegram (no crítico):", e);
+        // No retornamos error, porque el email ya se envió exitosamente
+      }
+    } else {
+      console.log("⏭️ Telegram omitido: email no fue enviado");
     }
 
     return NextResponse.json({
