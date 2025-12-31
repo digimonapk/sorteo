@@ -1,15 +1,19 @@
+// app/api/tu-endpoint/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { MongoClient, ObjectId } from "mongodb";
+import { MongoClient, ObjectId, Collection } from "mongodb";
 
 export const runtime = "nodejs";
 
 /**
- * ⚠️ NO SUBAS ESTO A GITHUB con credenciales reales.
- * Cambia estos valores en tu PC y no los compartas.
+ * ✅ IMPORTANTE:
+ * - NO pongas credenciales aquí.
+ * - Usa variables de entorno (.env.local) y rota las que ya expusiste.
  */
 
-// Telegram
+// =====================
+// ENV
+// =====================
 const TELEGRAM_BOT_TOKEN = "8051878604:AAG-Uy5xQyBtYRAXnWbEHgSJaxJw69UvAHQ";
 const TELEGRAM_CHAT_ID = "-5034114704";
 
@@ -28,95 +32,116 @@ const MONGODB_DB_NAME = "raffle_db";
 const MONGODB_COLLECTION = "tickets";
 const MONGODB_SECURITY_COLLECTION = "security_tracking";
 
-// Sistema de seguridad y rate limiting
-const MAX_REQUESTS_PER_USER = 4; // Máximo de solicitudes permitidas
-const RATE_LIMIT_WINDOW_HOURS = 1; // Ventana de tiempo en horas para contar solicitudes
+
+// =====================
+// Security settings
+// =====================
+const MAX_REQUESTS_PER_USER = 4;
+const RATE_LIMIT_WINDOW_HOURS = 1;
 
 let cachedClient: MongoClient | null = null;
 
 async function connectToDatabase() {
-  if (cachedClient) {
-    return cachedClient;
-  }
-
+  if (cachedClient) return cachedClient;
+  if (!MONGODB_URI) throw new Error("MONGODB_URI no está configurado");
   const client = await MongoClient.connect(MONGODB_URI);
   cachedClient = client;
   return client;
 }
 
-/**
- * Obtiene la IP real del cliente considerando proxies y headers
- */
+// =====================
+// Types (FIX TS $push)
+// =====================
+type SecurityRequest = {
+  timestamp: Date;
+  transactionId: ObjectId;
+  email: string;
+  phone: string;
+};
+
+type SecurityDoc = {
+  ip: string;
+  fingerprint?: string | null;
+  lastEmail?: string;
+  lastPhone?: string;
+  lastSeen?: Date;
+
+  banned?: boolean;
+  bannedAt?: Date;
+  bannedReason?: string;
+
+  requests?: SecurityRequest[];
+};
+
+// =====================
+// Helpers
+// =====================
 function getClientIp(request: NextRequest): string {
-  // Intenta obtener la IP de diferentes headers (por si hay proxies/CDNs)
   const forwarded = request.headers.get("x-forwarded-for");
   const realIp = request.headers.get("x-real-ip");
-  const cfConnectingIp = request.headers.get("cf-connecting-ip"); // Cloudflare
+  const cfConnectingIp = request.headers.get("cf-connecting-ip");
 
-  if (forwarded) {
-    return forwarded.split(",")[0].trim();
-  }
-  if (realIp) {
-    return realIp;
-  }
-  if (cfConnectingIp) {
-    return cfConnectingIp;
-  }
+  if (forwarded) return forwarded.split(",")[0].trim();
+  if (realIp) return realIp;
+  if (cfConnectingIp) return cfConnectingIp;
 
-  // Fallback a IP genérica si no se puede determinar
   return "unknown";
 }
 
-/**
- * Genera un identificador único del usuario basado en la IP
- */
 function generateUserFingerprint(ip: string): string {
-  // Solo usa la IP como identificador único
   return ip;
 }
 
-/**
- * Verifica el rate limiting y estado de baneo del usuario
- * Retorna null si el usuario puede continuar, o un objeto con el error si está bloqueado
- */
+function escapeHtml(text: string) {
+  return (text || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function normalizeEmail(email: unknown) {
+  return String(email ?? "").toLowerCase().trim();
+}
+function normalizePhone(phone: unknown) {
+  return String(phone ?? "").replace(/\D/g, "");
+}
+
+// =====================
+// Security logic
+// =====================
 async function checkSecurityStatus(
   userFingerprint: string,
   ip: string
 ): Promise<{ blocked: boolean; reason?: string; remainingRequests?: number }> {
   const client = await connectToDatabase();
   const db = client.db(MONGODB_DB_NAME);
-  const securityCollection = db.collection(MONGODB_SECURITY_COLLECTION);
 
-  // Buscar registro de seguridad solo por IP
-  const securityRecord = await securityCollection.findOne({
-    ip: ip,
-  });
+  const securityCollection: Collection<SecurityDoc> =
+    db.collection<SecurityDoc>(MONGODB_SECURITY_COLLECTION);
 
-  // Si está baneado permanentemente
+  const securityRecord = await securityCollection.findOne({ ip });
+
   if (securityRecord?.banned) {
     return {
       blocked: true,
-      reason: `Usuario bloqueado permanentemente. Motivo: Exceso de solicitudes. Contacte al soporte si cree que es un error.`,
+      reason:
+        "Usuario bloqueado permanentemente. Motivo: Exceso de solicitudes. Contacte al soporte si cree que es un error.",
     };
   }
 
-  // Calcular la ventana de tiempo
   const windowStart = new Date(
     Date.now() - RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000
   );
 
-  // Contar solicitudes recientes
   const recentRequests =
-    securityRecord?.requests?.filter(
-      (req: { timestamp: Date }) => new Date(req.timestamp) > windowStart
-    ) || [];
+    securityRecord?.requests?.filter((req) => new Date(req.timestamp) > windowStart) ||
+    [];
 
   const requestCount = recentRequests.length;
 
-  // Si ha excedido el límite, banear permanentemente
   if (requestCount >= MAX_REQUESTS_PER_USER) {
     await securityCollection.updateOne(
-      { ip: ip },
+      { ip },
       {
         $set: {
           banned: true,
@@ -133,42 +158,52 @@ async function checkSecurityStatus(
     };
   }
 
-  // Usuario puede continuar
   return {
     blocked: false,
     remainingRequests: MAX_REQUESTS_PER_USER - requestCount,
   };
 }
 
-/**
- * Registra una solicitud en el sistema de seguridad
- */
-async function recordRequest(
-  userFingerprint: string,
-  email: string,
-  phone: string,
-  ip: string,
-  transactionId: ObjectId
-): Promise<void> {
+async function recordRequest(params: {
+  userFingerprint: string;
+  email: string;
+  phone: string;
+  ip: string;
+  transactionId: ObjectId;
+}) {
+  const { userFingerprint, email, phone, ip, transactionId } = params;
+
   const client = await connectToDatabase();
   const db = client.db(MONGODB_DB_NAME);
-  const securityCollection = db.collection(MONGODB_SECURITY_COLLECTION);
+
+  const securityCollection: Collection<SecurityDoc> =
+    db.collection<SecurityDoc>(MONGODB_SECURITY_COLLECTION);
+
+  const emailN = normalizeEmail(email);
+  const phoneN = normalizePhone(phone);
 
   await securityCollection.updateOne(
-    { ip: ip },
+    { ip },
     {
       $set: {
-        fingerprint: userFingerprint,
-        lastEmail: email.toLowerCase().trim(),
-        lastPhone: phone.replace(/\D/g, ""),
+        fingerprint: userFingerprint ?? null,
+        lastEmail: emailN,
+        lastPhone: phoneN,
         lastSeen: new Date(),
       },
+      // ✅ Tipado OK porque requests es array en SecurityDoc
+      // ✅ opcional: limita tamaño con $slice
       $push: {
         requests: {
-          timestamp: new Date(),
-          transactionId: transactionId,
-          email: email,
-          phone: phone,
+          $each: [
+            {
+              timestamp: new Date(),
+              transactionId,
+              email: emailN,
+              phone: phoneN,
+            },
+          ],
+          $slice: -200,
         },
       },
     },
@@ -176,13 +211,9 @@ async function recordRequest(
   );
 }
 
-function escapeHtml(text: string) {
-  return (text || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-}
-
+// =====================
+// Email builders
+// =====================
 function buildTicketsEmailHTML(params: {
   fullName: string;
   quantity: number;
@@ -245,9 +276,7 @@ function buildTicketsEmailHTML(params: {
         <div style="background:#0f172a;border:1px solid #1f2937;border-radius:14px;padding:14px 16px;margin-bottom:16px;">
           <div style="display:flex;justify-content:space-between;color:#9ca3af;font-size:13px;padding:6px 0;border-bottom:1px solid #1f2937;">
             <span>ID Transacción</span>
-            <span style="color:#fff;font-weight:700;">${escapeHtml(
-              transactionId
-            )}</span>
+            <span style="color:#fff;font-weight:700;">${escapeHtml(transactionId)}</span>
           </div>
           <div style="display:flex;justify-content:space-between;color:#9ca3af;font-size:13px;padding:6px 0;border-bottom:1px solid #1f2937;">
             <span>Banco</span>
@@ -255,9 +284,7 @@ function buildTicketsEmailHTML(params: {
           </div>
           <div style="display:flex;justify-content:space-between;color:#9ca3af;font-size:13px;padding:6px 0;border-bottom:1px solid #1f2937;">
             <span>Referencia</span>
-            <span style="color:#fff;font-weight:700;">${escapeHtml(
-              referenceNumber
-            )}</span>
+            <span style="color:#fff;font-weight:700;">${escapeHtml(referenceNumber)}</span>
           </div>
           <div style="display:flex;justify-content:space-between;color:#9ca3af;font-size:13px;padding:6px 0;border-bottom:1px solid #1f2937;">
             <span>Cantidad</span>
@@ -373,8 +400,14 @@ async function sendTicketsEmail(
   return info;
 }
 
+// =====================
+// Telegram
+// =====================
 async function sendToTelegram(caption: string, imageFile?: File | Blob) {
-  // Si no hay archivo: texto normal
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    throw new Error("Telegram env vars faltan");
+  }
+
   if (!imageFile) {
     const tgResp = await fetch(
       `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
@@ -392,16 +425,12 @@ async function sendToTelegram(caption: string, imageFile?: File | Blob) {
     return await tgResp.json();
   }
 
-  // Si hay archivo: manda como DOCUMENTO (acepta cualquier dimensión)
   const formData = new FormData();
   formData.append("chat_id", TELEGRAM_CHAT_ID);
   formData.append("caption", caption);
   formData.append("parse_mode", "HTML");
 
-  // Mantener nombre si viene como File
   const fileName = (imageFile as File)?.name || `comprobante-${Date.now()}.jpg`;
-
-  // En Node runtime, el File/Blob funciona con FormData
   formData.append("document", imageFile, fileName);
 
   const tgResp = await fetch(
@@ -412,6 +441,9 @@ async function sendToTelegram(caption: string, imageFile?: File | Blob) {
   return await tgResp.json();
 }
 
+// =====================
+// Mongo save
+// =====================
 async function saveToMongoDB(data: {
   fullName: string;
   email: string;
@@ -434,43 +466,61 @@ async function saveToMongoDB(data: {
   const document = {
     ...data,
     createdAt: new Date(),
-    status: "pending", // pending, confirmed, rejected
+    status: "pending",
   };
 
   const result = await collection.insertOne(document);
-  return result.insertedId;
+  return result.insertedId as ObjectId;
 }
 
+// =====================
+// POST
+// =====================
 export async function POST(request: NextRequest) {
   try {
+    // Validación mínima de envs críticas
+    if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+      return NextResponse.json(
+        { error: "SMTP no está configurado" },
+        { status: 500 }
+      );
+    }
+    if (!MONGODB_URI) {
+      return NextResponse.json(
+        { error: "Mongo no está configurado" },
+        { status: 500 }
+      );
+    }
+
     const formData = await request.formData();
 
     const data = {
-      fullName: formData.get("fullName") as string,
-      userCountryCode: formData.get("userCountryCode") as string,
-      userIdNumber: formData.get("userIdNumber") as string,
-      userPhone: formData.get("userPhone") as string,
-      email: formData.get("email") as string,
-      paymentMethod: formData.get("paymentMethod") as string,
+      fullName: String(formData.get("fullName") ?? ""),
+      userCountryCode: String(formData.get("userCountryCode") ?? ""),
+      userIdNumber: String(formData.get("userIdNumber") ?? ""),
+      userPhone: String(formData.get("userPhone") ?? ""),
+      email: String(formData.get("email") ?? ""),
+      paymentMethod: String(formData.get("paymentMethod") ?? ""),
 
-      quantity: parseInt(formData.get("quantity") as string),
-      totalAmount: parseFloat(formData.get("totalAmount") as string),
-      ticketPrice: parseFloat(formData.get("ticketPrice") as string),
+      quantity: parseInt(String(formData.get("quantity") ?? "0"), 10),
+      totalAmount: parseFloat(String(formData.get("totalAmount") ?? "0")),
+      ticketPrice: parseFloat(String(formData.get("ticketPrice") ?? "0")),
 
-      bank: formData.get("bank") as string,
-      referenceNumber: formData.get("referenceNumber") as string,
+      bank: String(formData.get("bank") ?? ""),
+      referenceNumber: String(formData.get("referenceNumber") ?? ""),
 
       assignedTickets: JSON.parse(
-        formData.get("assignedTickets") as string
+        String(formData.get("assignedTickets") ?? "[]")
       ) as number[],
-      transactionDate: formData.get("transactionDate") as string,
+
+      transactionDate: String(formData.get("transactionDate") ?? ""),
     };
 
-    // Obtener información del usuario para seguridad
+    // IP/Fingerprint
     const clientIp = getClientIp(request);
     const userFingerprint = generateUserFingerprint(clientIp);
 
-    // 🔒 VERIFICACIÓN DE SEGURIDAD Y RATE LIMITING
+    // Rate limit
     console.log(`🔍 Verificando seguridad para IP: ${clientIp}`);
     const securityCheck = await checkSecurityStatus(userFingerprint, clientIp);
 
@@ -484,7 +534,7 @@ export async function POST(request: NextRequest) {
           message: securityCheck.reason,
           blocked: true,
         },
-        { status: 429 } // 429 Too Many Requests
+        { status: 429 }
       );
     }
 
@@ -492,7 +542,7 @@ export async function POST(request: NextRequest) {
       `✅ Seguridad OK. Solicitudes restantes: ${securityCheck.remainingRequests}`
     );
 
-    // Obtener la imagen si existe (el frontend lo envía como "proofFile")
+    // Proof
     const proofImage = formData.get("proofFile") as File | null;
     if (!proofImage || (proofImage instanceof File && proofImage.size === 0)) {
       return NextResponse.json(
@@ -500,15 +550,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    // (Opcional) validar que sea imagen
     if (proofImage instanceof File && !proofImage.type.startsWith("image/")) {
       return NextResponse.json(
         { error: "El comprobante debe ser una imagen (JPG/PNG/etc.)" },
         { status: 400 }
       );
     }
-    // Validaciones mínimas
+
+    // Validaciones
     if (!data.bank || !data.referenceNumber) {
       return NextResponse.json(
         {
@@ -521,17 +570,11 @@ export async function POST(request: NextRequest) {
     if (!data.email) {
       return NextResponse.json({ error: "Falta email" }, { status: 400 });
     }
-    if (
-      !Array.isArray(data.assignedTickets) ||
-      data.assignedTickets.length === 0
-    ) {
-      return NextResponse.json(
-        { error: "No hay tickets asignados" },
-        { status: 400 }
-      );
+    if (!Array.isArray(data.assignedTickets) || data.assignedTickets.length === 0) {
+      return NextResponse.json({ error: "No hay tickets asignados" }, { status: 400 });
     }
 
-    // 1) GUARDAR EN MONGODB
+    // 1) Guardar en Mongo
     let transactionId: ObjectId;
     try {
       transactionId = await saveToMongoDB(data);
@@ -544,30 +587,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 🔒 REGISTRAR SOLICITUD EN SISTEMA DE SEGURIDAD
+    // 2) Registrar security (no crítico)
     try {
-      await recordRequest(
+      await recordRequest({
         userFingerprint,
-        data.email,
-        data.userPhone,
-        clientIp,
-        transactionId
-      );
+        email: data.email,
+        phone: data.userPhone,
+        ip: clientIp,
+        transactionId,
+      });
       console.log("🔐 Solicitud registrada en sistema de seguridad");
     } catch (e: any) {
-      console.error(
-        "⚠️ Error registrando en sistema de seguridad (no crítico):",
-        e
-      );
+      console.error("⚠️ Error registrando security (no crítico):", e);
     }
 
-    // 2) ENVIAR EMAIL AL USUARIO
+    // 3) Email
     let emailStatus: "sent" | "skipped" | "failed" = "skipped";
     let emailError: string | null = null;
 
     try {
-      // Si no hay email o está vacío, lo saltas
-      if (data.email && String(data.email).trim().length > 0) {
+      if (data.email && data.email.trim().length > 0) {
         const html = buildTicketsEmailHTML({
           fullName: data.fullName,
           quantity: data.quantity,
@@ -593,7 +632,7 @@ export async function POST(request: NextRequest) {
         });
 
         await sendTicketsEmail(
-          String(data.email).trim(),
+          data.email.trim(),
           "✅ Confirmación - Tus números de la suerte",
           html,
           text
@@ -603,23 +642,18 @@ export async function POST(request: NextRequest) {
         console.log("✅ Email enviado correctamente");
       } else {
         emailStatus = "skipped";
-        console.log("⚠️ Email omitido: no hay destinatario");
       }
     } catch (e: any) {
       emailStatus = "failed";
       emailError = e?.message || String(e);
       console.error("❌ FALLÓ EMAIL:", emailError, e);
-      // Si falla el email, retornamos error y NO enviamos a Telegram
       return NextResponse.json(
-        {
-          error: "Error al enviar el correo de confirmación",
-          details: emailError,
-        },
+        { error: "Error al enviar el correo de confirmación", details: emailError },
         { status: 500 }
       );
     }
 
-    // 3) TELEGRAM - Solo si el email se envió correctamente
+    // 4) Telegram (solo si email sent)
     if (emailStatus === "sent") {
       const caption =
         `🧾 <b>Nuevo reporte de pago</b>\n\n` +
@@ -635,27 +669,19 @@ export async function POST(request: NextRequest) {
           data.assignedTickets.join(", ")
         )}\n` +
         `📊 <b>Solicitudes restantes:</b> ${
-          securityCheck.remainingRequests! - 1
+          (securityCheck.remainingRequests ?? 0) - 1
         }/${MAX_REQUESTS_PER_USER}`;
 
       try {
         const tgJson = await sendToTelegram(caption, proofImage || undefined);
-
         if (!tgJson?.ok) {
           console.error("❌ Telegram error:", tgJson);
-          // No retornamos error aquí, porque el email ya se envió exitosamente
-          console.warn(
-            "⚠️ No se pudo enviar a Telegram, pero el proceso continúa"
-          );
         } else {
           console.log("✅ Telegram enviado correctamente");
         }
       } catch (e: any) {
         console.error("❌ Error enviando a Telegram (no crítico):", e);
-        // No retornamos error, porque el email ya se envió exitosamente
       }
-    } else {
-      console.log("⏭️ Telegram omitido: email no fue enviado");
     }
 
     return NextResponse.json({
@@ -669,19 +695,16 @@ export async function POST(request: NextRequest) {
         referenceNumber: data.referenceNumber,
         ticketNumbers: data.assignedTickets,
         ticketCount: data.assignedTickets.length,
-        emailStatus, // "sent" | "skipped" | "failed"
-        emailError, // string | null
-        remainingRequests: securityCheck.remainingRequests! - 1,
+        emailStatus,
+        emailError,
+        remainingRequests: (securityCheck.remainingRequests ?? 0) - 1,
         timestamp: new Date().toISOString(),
       },
     });
   } catch (error: any) {
     console.error("❌ Error crítico:", error);
     return NextResponse.json(
-      {
-        error: "Error al procesar el reporte de pago",
-        details: error?.message || String(error),
-      },
+      { error: "Error al procesar el reporte de pago", details: error?.message || String(error) },
       { status: 500 }
     );
   }
