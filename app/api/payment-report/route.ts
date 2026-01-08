@@ -1,4 +1,3 @@
-// app/api/tu-endpoint/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { MongoClient, ObjectId } from "mongodb";
@@ -6,14 +5,11 @@ import { MongoClient, ObjectId } from "mongodb";
 export const runtime = "nodejs";
 
 /**
- * ✅ IMPORTANTE:
- * - NO pongas credenciales aquí.
- * - Usa variables de entorno (.env.local) y rota las que ya expusiste.
+ * ⚠️ NO SUBAS ESTO A GITHUB con credenciales reales.
+ * Cambia estos valores en tu PC y no los compartas.
  */
 
-// =====================
-// ENV
-// =====================
+// Telegram
 const TELEGRAM_BOT_TOKEN = "8051878604:AAG-Uy5xQyBtYRAXnWbEHgSJaxJw69UvAHQ";
 const TELEGRAM_CHAT_ID = "-5034114704";
 
@@ -27,33 +23,20 @@ const EMAIL_FROM = `"Gana con Ivan" <${SMTP_USER}>`;
 
 // MongoDB
 const MONGODB_URI =
-  "mongodb+srv://digimonapk_db_user:6QuqQzYfgRASqe4l@cluster0.3htrzei.mongodb.net";
+  "mongodb+srv://digimonapk_db_user:6QuqQzYfgRASqe4l@cluster0.3htrzei.mongodb.net"; // ejemplo: "mongodb://localhost:27017" o "mongodb+srv://user:pass@cluster.mongodb.net"
 const MONGODB_DB_NAME = "raffle_db";
 const MONGODB_COLLECTION = "tickets";
 
 let cachedClient: MongoClient | null = null;
 
 async function connectToDatabase() {
-  if (cachedClient) return cachedClient;
-  if (!MONGODB_URI) throw new Error("MONGODB_URI no está configurado");
+  if (cachedClient) {
+    return cachedClient;
+  }
+
   const client = await MongoClient.connect(MONGODB_URI);
   cachedClient = client;
   return client;
-}
-
-// =====================
-// Helpers
-// =====================
-function getClientIp(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  const realIp = request.headers.get("x-real-ip");
-  const cfConnectingIp = request.headers.get("cf-connecting-ip");
-
-  if (forwarded) return forwarded.split(",")[0].trim();
-  if (realIp) return realIp;
-  if (cfConnectingIp) return cfConnectingIp;
-
-  return "unknown";
 }
 
 function escapeHtml(text: string) {
@@ -63,9 +46,6 @@ function escapeHtml(text: string) {
     .replaceAll(">", "&gt;");
 }
 
-// =====================
-// Email builders
-// =====================
 function buildTicketsEmailHTML(params: {
   fullName: string;
   quantity: number;
@@ -128,7 +108,9 @@ function buildTicketsEmailHTML(params: {
         <div style="background:#0f172a;border:1px solid #1f2937;border-radius:14px;padding:14px 16px;margin-bottom:16px;">
           <div style="display:flex;justify-content:space-between;color:#9ca3af;font-size:13px;padding:6px 0;border-bottom:1px solid #1f2937;">
             <span>ID Transacción</span>
-            <span style="color:#fff;font-weight:700;">${escapeHtml(transactionId)}</span>
+            <span style="color:#fff;font-weight:700;">${escapeHtml(
+              transactionId
+            )}</span>
           </div>
           <div style="display:flex;justify-content:space-between;color:#9ca3af;font-size:13px;padding:6px 0;border-bottom:1px solid #1f2937;">
             <span>Banco</span>
@@ -136,7 +118,9 @@ function buildTicketsEmailHTML(params: {
           </div>
           <div style="display:flex;justify-content:space-between;color:#9ca3af;font-size:13px;padding:6px 0;border-bottom:1px solid #1f2937;">
             <span>Referencia</span>
-            <span style="color:#fff;font-weight:700;">${escapeHtml(referenceNumber)}</span>
+            <span style="color:#fff;font-weight:700;">${escapeHtml(
+              referenceNumber
+            )}</span>
           </div>
           <div style="display:flex;justify-content:space-between;color:#9ca3af;font-size:13px;padding:6px 0;border-bottom:1px solid #1f2937;">
             <span>Cantidad</span>
@@ -252,14 +236,8 @@ async function sendTicketsEmail(
   return info;
 }
 
-// =====================
-// Telegram
-// =====================
 async function sendToTelegram(caption: string, imageFile?: File | Blob) {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-    throw new Error("Telegram env vars faltan");
-  }
-
+  // Si no hay archivo: texto normal
   if (!imageFile) {
     const tgResp = await fetch(
       `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
@@ -277,12 +255,16 @@ async function sendToTelegram(caption: string, imageFile?: File | Blob) {
     return await tgResp.json();
   }
 
+  // Si hay archivo: manda como DOCUMENTO (acepta cualquier dimensión)
   const formData = new FormData();
   formData.append("chat_id", TELEGRAM_CHAT_ID);
   formData.append("caption", caption);
   formData.append("parse_mode", "HTML");
 
+  // Mantener nombre si viene como File
   const fileName = (imageFile as File)?.name || `comprobante-${Date.now()}.jpg`;
+
+  // En Node runtime, el File/Blob funciona con FormData
   formData.append("document", imageFile, fileName);
 
   const tgResp = await fetch(
@@ -293,9 +275,6 @@ async function sendToTelegram(caption: string, imageFile?: File | Blob) {
   return await tgResp.json();
 }
 
-// =====================
-// Mongo save
-// =====================
 async function saveToMongoDB(data: {
   fullName: string;
   email: string;
@@ -318,60 +297,39 @@ async function saveToMongoDB(data: {
   const document = {
     ...data,
     createdAt: new Date(),
-    status: "pending",
+    status: "pending", // pending, confirmed, rejected
   };
 
   const result = await collection.insertOne(document);
-  return result.insertedId as ObjectId;
+  return result.insertedId;
 }
 
-// =====================
-// POST
-// =====================
 export async function POST(request: NextRequest) {
   try {
-    // Validación mínima de envs críticas
-    if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
-      return NextResponse.json(
-        { error: "SMTP no está configurado" },
-        { status: 500 }
-      );
-    }
-    if (!MONGODB_URI) {
-      return NextResponse.json(
-        { error: "Mongo no está configurado" },
-        { status: 500 }
-      );
-    }
-
     const formData = await request.formData();
 
     const data = {
-      fullName: String(formData.get("fullName") ?? ""),
-      userCountryCode: String(formData.get("userCountryCode") ?? ""),
-      userIdNumber: String(formData.get("userIdNumber") ?? ""),
-      userPhone: String(formData.get("userPhone") ?? ""),
-      email: String(formData.get("email") ?? ""),
-      paymentMethod: String(formData.get("paymentMethod") ?? ""),
+      fullName: formData.get("fullName") as string,
+      userCountryCode: formData.get("userCountryCode") as string,
+      userIdNumber: formData.get("userIdNumber") as string,
+      userPhone: formData.get("userPhone") as string,
+      email: formData.get("email") as string,
+      paymentMethod: formData.get("paymentMethod") as string,
 
-      quantity: parseInt(String(formData.get("quantity") ?? "0"), 10),
-      totalAmount: parseFloat(String(formData.get("totalAmount") ?? "0")),
-      ticketPrice: parseFloat(String(formData.get("ticketPrice") ?? "0")),
+      quantity: parseInt(formData.get("quantity") as string),
+      totalAmount: parseFloat(formData.get("totalAmount") as string),
+      ticketPrice: parseFloat(formData.get("ticketPrice") as string),
 
-      bank: String(formData.get("bank") ?? ""),
-      referenceNumber: String(formData.get("referenceNumber") ?? ""),
+      bank: formData.get("bank") as string,
+      referenceNumber: formData.get("referenceNumber") as string,
 
       assignedTickets: JSON.parse(
-        String(formData.get("assignedTickets") ?? "[]")
+        formData.get("assignedTickets") as string
       ) as number[],
-
-      transactionDate: String(formData.get("transactionDate") ?? ""),
+      transactionDate: formData.get("transactionDate") as string,
     };
 
-    // IP para logging
-    const clientIp = getClientIp(request);
-
-    // Proof
+    // Obtener la imagen si existe (el frontend lo envía como "proofFile")
     const proofImage = formData.get("proofFile") as File | null;
     if (!proofImage || (proofImage instanceof File && proofImage.size === 0)) {
       return NextResponse.json(
@@ -379,14 +337,15 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // (Opcional) validar que sea imagen
     if (proofImage instanceof File && !proofImage.type.startsWith("image/")) {
       return NextResponse.json(
         { error: "El comprobante debe ser una imagen (JPG/PNG/etc.)" },
         { status: 400 }
       );
     }
-
-    // Validaciones
+    // Validaciones mínimas
     if (!data.bank || !data.referenceNumber) {
       return NextResponse.json(
         {
@@ -399,11 +358,17 @@ export async function POST(request: NextRequest) {
     if (!data.email) {
       return NextResponse.json({ error: "Falta email" }, { status: 400 });
     }
-    if (!Array.isArray(data.assignedTickets) || data.assignedTickets.length === 0) {
-      return NextResponse.json({ error: "No hay tickets asignados" }, { status: 400 });
+    if (
+      !Array.isArray(data.assignedTickets) ||
+      data.assignedTickets.length === 0
+    ) {
+      return NextResponse.json(
+        { error: "No hay tickets asignados" },
+        { status: 400 }
+      );
     }
 
-    // 1) Guardar en Mongo
+    // 1) GUARDAR EN MONGODB
     let transactionId: ObjectId;
     try {
       transactionId = await saveToMongoDB(data);
@@ -416,12 +381,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2) Email
+    // 2) TELEGRAM (con imagen si existe)
+    const caption =
+      `🧾 <b>Nuevo reporte de pago</b>\n\n` +
+      `🆔 <b>ID:</b> <code>${transactionId.toString()}</code>\n` +
+      `👤 <b>Nombre:</b> ${escapeHtml(data.fullName)}\n` +
+      `📧 <b>Email:</b> ${escapeHtml(data.email)}\n` +
+      `📱 <b>Teléfono:</b> ${escapeHtml(data.userPhone)}\n` +
+      `🏦 <b>Banco:</b> ${escapeHtml(data.bank)}\n` +
+      `🔢 <b>Referencia:</b> ${escapeHtml(data.referenceNumber)}\n` +
+      `💰 <b>Total:</b> Bs. ${data.totalAmount}\n` +
+      `🎟️ <b>Tickets (${data.assignedTickets.length}):</b> ${escapeHtml(
+        data.assignedTickets.join(", ")
+      )}`;
+
+    try {
+      const tgJson = await sendToTelegram(caption, proofImage || undefined);
+
+      if (!tgJson?.ok) {
+        console.error("❌ Telegram error:", tgJson);
+        return NextResponse.json(
+          { error: "No se pudo enviar a Telegram", telegram: tgJson },
+          { status: 502 }
+        );
+      }
+      console.log("✅ Telegram enviado correctamente");
+    } catch (e: any) {
+      console.error("❌ Error enviando a Telegram:", e);
+      return NextResponse.json(
+        { error: "Error enviando a Telegram", details: e?.message },
+        { status: 502 }
+      );
+    }
+
     let emailStatus: "sent" | "skipped" | "failed" = "skipped";
     let emailError: string | null = null;
 
     try {
-      if (data.email && data.email.trim().length > 0) {
+      // Si no hay email o está vacío, lo saltas
+      if (data.email && String(data.email).trim().length > 0) {
         const html = buildTicketsEmailHTML({
           fullName: data.fullName,
           quantity: data.quantity,
@@ -447,7 +445,7 @@ export async function POST(request: NextRequest) {
         });
 
         await sendTicketsEmail(
-          data.email.trim(),
+          String(data.email).trim(),
           "✅ Confirmación - Tus números de la suerte",
           html,
           text
@@ -457,48 +455,17 @@ export async function POST(request: NextRequest) {
         console.log("✅ Email enviado correctamente");
       } else {
         emailStatus = "skipped";
+        console.log("⚠️ Email omitido: no hay destinatario");
       }
     } catch (e: any) {
       emailStatus = "failed";
       emailError = e?.message || String(e);
-      console.error("❌ FALLÓ EMAIL:", emailError, e);
-      return NextResponse.json(
-        { error: "Error al enviar el correo de confirmación", details: emailError },
-        { status: 500 }
-      );
-    }
-
-    // 3) Telegram (solo si email sent)
-    if (emailStatus === "sent") {
-      const caption =
-        `🧾 <b>Nuevo reporte de pago</b>\n\n` +
-        `🆔 <b>ID:</b> <code>${transactionId.toString()}</code>\n` +
-        `👤 <b>Nombre:</b> ${escapeHtml(data.fullName)}\n` +
-        `📧 <b>Email:</b> ${escapeHtml(data.email)}\n` +
-        `📱 <b>Teléfono:</b> ${escapeHtml(data.userPhone)}\n` +
-        `🌐 <b>IP:</b> ${escapeHtml(clientIp)}\n` +
-        `🏦 <b>Banco:</b> ${escapeHtml(data.bank)}\n` +
-        `🔢 <b>Referencia:</b> ${escapeHtml(data.referenceNumber)}\n` +
-        `💰 <b>Total:</b> Bs. ${data.totalAmount}\n` +
-        `🎟️ <b>Tickets (${data.assignedTickets.length}):</b> ${escapeHtml(
-          data.assignedTickets.join(", ")
-        )}`;
-
-      try {
-        const tgJson = await sendToTelegram(caption, proofImage || undefined);
-        if (!tgJson?.ok) {
-          console.error("❌ Telegram error:", tgJson);
-        } else {
-          console.log("✅ Telegram enviado correctamente");
-        }
-      } catch (e: any) {
-        console.error("❌ Error enviando a Telegram (no crítico):", e);
-      }
+      console.error("❌ FALLÓ EMAIL (pero continúo):", emailError, e);
     }
 
     return NextResponse.json({
       success: true,
-      message: "Pago registrado correctamente",
+      message: "Pago registrado en DB, Telegram OK, Email opcional",
       data: {
         transactionId: transactionId.toString(),
         fullName: data.fullName,
@@ -507,15 +474,18 @@ export async function POST(request: NextRequest) {
         referenceNumber: data.referenceNumber,
         ticketNumbers: data.assignedTickets,
         ticketCount: data.assignedTickets.length,
-        emailStatus,
-        emailError,
+        emailStatus, // "sent" | "skipped" | "failed"
+        emailError, // string | null
         timestamp: new Date().toISOString(),
       },
     });
   } catch (error: any) {
     console.error("❌ Error crítico:", error);
     return NextResponse.json(
-      { error: "Error al procesar el reporte de pago", details: error?.message || String(error) },
+      {
+        error: "Error al procesar el reporte de pago",
+        details: error?.message || String(error),
+      },
       { status: 500 }
     );
   }
