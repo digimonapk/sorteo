@@ -1157,7 +1157,7 @@ export default function RaffleTickets() {
                     clipRule="evenodd"
                   />
                 </svg>
-                <span className="font-semibold">10 Enero 2026</span>
+                <span className="font-semibold">14 Enero 2026</span>
               </div>
               <div className="text-right flex flex-col items-end gap-1">
                 <img
