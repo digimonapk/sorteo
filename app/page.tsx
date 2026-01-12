@@ -1191,32 +1191,32 @@ export default function RaffleTickets() {
                 </button>
               ))}
             </div>
+<div className="flex items-center gap-3 mb-6 max-w-full">
+  <button
+    onClick={() => handleQuantityChange(selectedQuantity - 1)}
+    className="w-10 h-10 md:w-12 md:h-12 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
+  >
+    <Minus size={18} />
+  </button>
 
-            <div className="flex items-center gap-4 mb-6">
-              <button
-                onClick={() => handleQuantityChange(selectedQuantity - 1)}
-                className="w-12 h-12 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center transition-colors"
-              >
-                <Minus size={20} />
-              </button>
+  <input
+    type="number"
+    min={7}
+    value={selectedQuantity}
+    onChange={(e) =>
+      handleQuantityChange(parseInt(e.target.value || "7", 10))
+    }
+    className="w-24 md:w-32 px-3 py-2 bg-slate-700 border border-slate-600 text-white text-center text-lg font-bold rounded-lg"
+  />
 
-              <input
-                type="number"
-                min={7}
-                value={selectedQuantity}
-                onChange={(e) =>
-                  handleQuantityChange(parseInt(e.target.value || "1", 10) || 1)
-                }
-                className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 text-white text-center text-xl font-bold rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
+  <button
+    onClick={() => handleQuantityChange(selectedQuantity + 1)}
+    className="w-10 h-10 md:w-12 md:h-12 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
+  >
+    <Plus size={18} />
+  </button>
+</div>
 
-              <button
-                onClick={() => handleQuantityChange(selectedQuantity + 1)}
-                className="w-12 h-12 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center transition-colors"
-              >
-                <Plus size={20} />
-              </button>
-            </div>
 
             <button
               onClick={handleParticipate}
