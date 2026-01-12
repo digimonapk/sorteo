@@ -1190,40 +1190,51 @@ export default function RaffleTickets() {
                   )}
                 </button>
               ))}
-            </div>
-<div className="flex items-center gap-3 mb-6 max-w-full">
+<div className="flex flex-col md:flex-row items-center gap-4 mb-6 w-full">
+  
+  {/* Selector cantidad */}
+  <div className="flex items-center gap-3 w-full md:w-auto">
+    <button
+      onClick={() => handleQuantityChange(selectedQuantity - 1)}
+      className="w-10 h-10 md:w-12 md:h-12 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
+    >
+      <Minus size={18} />
+    </button>
+
+    <input
+      type="number"
+      min={7}
+      value={selectedQuantity}
+      onChange={(e) =>
+        handleQuantityChange(parseInt(e.target.value || "7", 10))
+      }
+      className="w-24 md:w-32 px-3 py-2 bg-slate-700 border border-slate-600 text-white text-center text-lg font-bold rounded-lg"
+    />
+
+    <button
+      onClick={() => handleQuantityChange(selectedQuantity + 1)}
+      className="w-10 h-10 md:w-12 md:h-12 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
+    >
+      <Plus size={18} />
+    </button>
+  </div>
+
+  {/* Botón participar */}
   <button
-    onClick={() => handleQuantityChange(selectedQuantity - 1)}
-    className="w-10 h-10 md:w-12 md:h-12 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
+    onClick={handleParticipate}
+    className="
+      w-full md:w-auto
+      px-8 py-4
+      bg-green-500 hover:bg-green-600
+      text-white text-xl font-bold
+      rounded-lg transition-colors shadow-lg
+      whitespace-nowrap
+    "
   >
-    <Minus size={18} />
+    Participar → Bs. {totalAmount}
   </button>
 
-  <input
-    type="number"
-    min={7}
-    value={selectedQuantity}
-    onChange={(e) =>
-      handleQuantityChange(parseInt(e.target.value || "7", 10))
-    }
-    className="w-24 md:w-32 px-3 py-2 bg-slate-700 border border-slate-600 text-white text-center text-lg font-bold rounded-lg"
-  />
-
-  <button
-    onClick={() => handleQuantityChange(selectedQuantity + 1)}
-    className="w-10 h-10 md:w-12 md:h-12 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
-  >
-    <Plus size={18} />
-  </button>
 </div>
-
-
-            <button
-              onClick={handleParticipate}
-              className="w-full py-4 bg-green-500 hover:bg-green-600 text-white text-xl font-bold rounded-lg transition-colors shadow-lg mb-4"
-            >
-              Participar → Bs. {totalAmount}
-            </button>
 
             <div className="space-y-3">
               <button className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors">
