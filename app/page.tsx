@@ -1192,51 +1192,46 @@ export default function RaffleTickets() {
               ))}
 
             </div>
-<div className="flex flex-col md:flex-row items-center gap-4 mb-6 w-full">
-  
-  {/* Selector cantidad */}
-  <div className="flex items-center gap-3 w-full md:w-auto">
+{/* SELECTOR + BOTÓN EN LA MISMA FILA */}
+<div className="flex items-stretch gap-3 mb-6 w-full">
+  {/* Selector cantidad (ancho fijo) */}
+  <div className="flex items-center gap-3 shrink-0">
     <button
       onClick={() => handleQuantityChange(selectedQuantity - 1)}
-      className="w-10 h-10 md:w-12 md:h-12 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
+      className="w-10 h-10 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
+      aria-label="Disminuir"
     >
       <Minus size={18} />
     </button>
 
     <input
       type="number"
-      min={7}
+      min={MIN_TICKETS}
       value={selectedQuantity}
       onChange={(e) =>
-        handleQuantityChange(parseInt(e.target.value || "7", 10))
+        handleQuantityChange(parseInt(e.target.value || `${MIN_TICKETS}`, 10))
       }
-      className="w-24 md:w-32 px-3 py-2 bg-slate-700 border border-slate-600 text-white text-center text-lg font-bold rounded-lg"
+      className="w-20 sm:w-24 px-3 py-2 bg-slate-700 border border-slate-600 text-white text-center text-lg font-bold rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
     />
 
     <button
       onClick={() => handleQuantityChange(selectedQuantity + 1)}
-      className="w-10 h-10 md:w-12 md:h-12 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
+      className="w-10 h-10 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
+      aria-label="Aumentar"
     >
       <Plus size={18} />
     </button>
   </div>
 
-  {/* Botón participar */}
+  {/* Botón ocupa el espacio restante a la derecha */}
   <button
     onClick={handleParticipate}
-    className="
-      w-full md:w-auto
-      px-8 py-4
-      bg-green-500 hover:bg-green-600
-      text-white text-xl font-bold
-      rounded-lg transition-colors shadow-lg
-      whitespace-nowrap
-    "
+    className="flex-1 px-4 py-3 bg-green-500 hover:bg-green-600 text-white text-base sm:text-lg font-bold rounded-lg transition-colors shadow-lg whitespace-nowrap"
   >
     Participar → Bs. {totalAmount}
   </button>
-
 </div>
+
 
             <div className="space-y-3">
               <button className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors">
