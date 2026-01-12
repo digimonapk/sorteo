@@ -1192,14 +1192,12 @@ export default function RaffleTickets() {
               ))}
 
             </div>
-{/* SELECTOR + BOTÓN EN LA MISMA FILA */}
-<div className="flex items-stretch gap-3 mb-6 w-full">
-  {/* Selector cantidad (ancho fijo) */}
+<div className="flex items-stretch gap-3 mb-6 w-full overflow-hidden">
+  {/* Selector (no se encoge) */}
   <div className="flex items-center gap-3 shrink-0">
     <button
       onClick={() => handleQuantityChange(selectedQuantity - 1)}
       className="w-10 h-10 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
-      aria-label="Disminuir"
     >
       <Minus size={18} />
     </button>
@@ -1211,22 +1209,28 @@ export default function RaffleTickets() {
       onChange={(e) =>
         handleQuantityChange(parseInt(e.target.value || `${MIN_TICKETS}`, 10))
       }
-      className="w-20 sm:w-24 px-3 py-2 bg-slate-700 border border-slate-600 text-white text-center text-lg font-bold rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+      className="w-20 px-3 py-2 bg-slate-700 border border-slate-600 text-white text-center text-lg font-bold rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
     />
 
     <button
       onClick={() => handleQuantityChange(selectedQuantity + 1)}
       className="w-10 h-10 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
-      aria-label="Aumentar"
     >
       <Plus size={18} />
     </button>
   </div>
 
-  {/* Botón ocupa el espacio restante a la derecha */}
+  {/* BOTÓN que rellena sin salirse */}
   <button
     onClick={handleParticipate}
-    className="flex-1 px-4 py-3 bg-green-500 hover:bg-green-600 text-white text-base sm:text-lg font-bold rounded-lg transition-colors shadow-lg whitespace-nowrap"
+    className="
+      flex-1 min-w-0
+      px-4 py-3
+      bg-green-500 hover:bg-green-600
+      text-white text-base sm:text-lg font-bold
+      rounded-lg transition-colors shadow-lg
+      truncate
+    "
   >
     Participar → Bs. {totalAmount}
   </button>
