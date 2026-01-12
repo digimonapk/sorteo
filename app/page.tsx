@@ -1190,6 +1190,8 @@ export default function RaffleTickets() {
                   )}
                 </button>
               ))}
+
+            </div>
 <div className="flex flex-col md:flex-row items-center gap-4 mb-6 w-full">
   
   {/* Selector cantidad */}
