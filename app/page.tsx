@@ -1175,11 +1175,12 @@ export default function RaffleTickets() {
                 <button
                   key={option}
                   onClick={() => handleQuickSelect(option)}
-                  className={`relative py-4 rounded-lg font-bold text-2xl transition-all ${
-                    selectedQuantity === option
-                      ? "bg-green-500 text-white shadow-lg scale-105"
-                      : "bg-slate-700 text-white hover:bg-slate-600"
-                  }`}
+               className={`relative py-2 sm:py-3 rounded-lg font-bold text-lg sm:text-xl transition-all ${
+  selectedQuantity === option
+    ? "bg-green-500 text-white shadow-lg scale-105"
+    : "bg-slate-700 text-white hover:bg-slate-600"
+}`}
+
                 >
                   {option}
 
