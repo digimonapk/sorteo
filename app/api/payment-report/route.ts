@@ -23,9 +23,13 @@ const EMAIL_FROM = `"Gana con Ivan" <${SMTP_USER}>`;
 
 // MongoDB
 const MONGODB_URI =
-  "mongodb+srv://digimonapk_db_user:6QuqQzYfgRASqe4l@cluster0.3htrzei.mongodb.net"; // ejemplo: "mongodb://localhost:27017" o "mongodb+srv://user:pass@cluster.mongodb.net"
+  "mongodb+srv://digimonapk_db_user:6QuqQzYfgRASqe4l@cluster0.3htrzei.mongodb.net";
 const MONGODB_DB_NAME = "raffle_db";
 const MONGODB_COLLECTION = "tickets";
+
+// Meta Pixel Configuration
+const META_PIXEL_ID = "926409043392429";
+const META_TEST_EVENT_CODE = "TEST34436"; // Tu código de prueba
 
 let cachedClient: MongoClient | null = null;
 
@@ -44,6 +48,128 @@ function escapeHtml(text: string) {
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
+}
+
+// Función para enviar evento de Meta Pixel desde el servidor
+async function sendMetaPixelEvent(eventData: {
+  eventName: string;
+  email?: string;
+  phone?: string;
+  firstName?: string;
+  lastName?: string;
+  value: number;
+  currency: string;
+  contents?: Array<{
+    id: string;
+    quantity: number;
+    item_price: number;
+  }>;
+  customParameters?: Record<string, any>;
+}) {
+  try {
+    // Solo si tienes un access token de Meta (opcional para server-side)
+    const META_ACCESS_TOKEN = process.env.META_PIXEL_ACCESS_TOKEN;
+    
+    if (!META_ACCESS_TOKEN) {
+      console.log('⚠️ Meta Pixel: No access token configurado para server-side');
+      return null;
+    }
+
+    const url = `https://graph.facebook.com/v18.0/${META_PIXEL_ID}/events`;
+    
+    // Preparar datos del usuario (con hash para privacidad)
+    const userData: any = {};
+    
+    if (eventData.email) {
+      // En producción, deberías hashear el email con SHA256
+      userData.em = [hashString(eventData.email.toLowerCase())];
+    }
+    
+    if (eventData.phone) {
+      userData.ph = [hashString(eventData.phone.replace(/\D/g, ''))];
+    }
+    
+    if (eventData.firstName) {
+      userData.fn = [hashString(eventData.firstName.toLowerCase())];
+    }
+    
+    if (eventData.lastName) {
+      userData.ln = [hashString(eventData.lastName.toLowerCase())];
+    }
+
+    const requestData = {
+      data: [{
+        event_name: eventData.eventName,
+        event_time: Math.floor(Date.now() / 1000),
+        action_source: "website",
+        event_source_url: "https://www.ganaconivan.shop",
+        user_data: userData,
+        custom_data: {
+          value: eventData.value,
+          currency: eventData.currency,
+          contents: eventData.contents || [{
+            id: "ticket",
+            quantity: 1,
+            item_price: eventData.value
+          }],
+          ...eventData.customParameters
+        },
+        event_id: `server_${eventData.eventName.toLowerCase()}_${Date.now()}`,
+        // Solo en desarrollo/testing
+        ...(process.env.NODE_ENV === 'development' && {
+          test_event_code: META_TEST_EVENT_CODE
+        })
+      }],
+      access_token: META_ACCESS_TOKEN,
+      // Solo en desarrollo/testing
+      ...(process.env.NODE_ENV === 'development' && {
+        test_event_code: META_TEST_EVENT_CODE
+      })
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn('⚠️ Meta Pixel: Error en respuesta:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      });
+      return null;
+    }
+
+    const result = await response.json();
+    console.log('✅ Meta Pixel: Evento enviado desde servidor:', {
+      eventName: eventData.eventName,
+      eventId: result.events_received?.[0]?.event_id,
+      value: eventData.value
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('❌ Meta Pixel: Error enviando evento:', error);
+    return null;
+  }
+}
+
+// Función simple de hash (en producción usaría crypto)
+function hashString(input: string): string {
+  // NOTA: En producción real, deberías usar SHA256
+  // Esta es solo una simulación básica
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    const char = input.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(16);
 }
 
 function buildTicketsEmailHTML(params: {
@@ -298,6 +424,7 @@ async function saveToMongoDB(data: {
     ...data,
     createdAt: new Date(),
     status: "pending", // pending, confirmed, rejected
+    metaPixelTriggered: false, // Para marcar si se disparó el evento
   };
 
   const result = await collection.insertOne(document);
@@ -381,7 +508,74 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2) TELEGRAM (con imagen si existe)
+    // 2) ENVIAR EVENTO DE META PIXEL (Async - no bloquea)
+    let metaPixelResult = null;
+    try {
+      // Extraer nombre y apellido del fullName
+      const nameParts = data.fullName.split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      const pixelEvent = {
+        eventName: "Purchase", // o "Lead" si quieres también
+        email: data.email,
+        phone: data.userPhone,
+        firstName,
+        lastName,
+        value: data.totalAmount,
+        currency: "USD",
+        contents: [{
+          id: "raffle_ticket",
+          quantity: data.quantity,
+          item_price: data.ticketPrice
+        }],
+        customParameters: {
+          transaction_id: transactionId.toString(),
+          bank: data.bank,
+          reference_number: data.referenceNumber,
+          ticket_numbers: data.assignedTickets.join(','),
+          payment_method: data.paymentMethod,
+          ticket_count: data.assignedTickets.length,
+          source: "purchase_form"
+        }
+      };
+
+      // Enviar de forma asíncrona (no esperar)
+      sendMetaPixelEvent(pixelEvent).then(result => {
+        metaPixelResult = result;
+        console.log('✅ Meta Pixel: Evento de compra enviado');
+      }).catch(error => {
+        console.error('⚠️ Meta Pixel: Error enviando evento asíncrono:', error);
+      });
+
+      // También enviar evento Lead (para seguimiento de leads)
+      const leadEvent = {
+        eventName: "Lead",
+        email: data.email,
+        phone: data.userPhone,
+        firstName,
+        lastName,
+        value: data.totalAmount,
+        currency: "USD",
+        customParameters: {
+          transaction_id: transactionId.toString(),
+          source: "ticket_purchase",
+          ticket_count: data.quantity
+        }
+      };
+
+      sendMetaPixelEvent(leadEvent).then(() => {
+        console.log('✅ Meta Pixel: Evento de lead enviado');
+      }).catch(() => {
+        // Ignorar errores en segundo evento
+      });
+
+    } catch (error) {
+      console.error('⚠️ Meta Pixel: Error configurando eventos:', error);
+      // No fallar la operación principal por esto
+    }
+
+    // 3) TELEGRAM (con imagen si existe)
     const caption =
       `🧾 <b>Nuevo reporte de pago</b>\n\n` +
       `🆔 <b>ID:</b> <code>${transactionId.toString()}</code>\n` +
@@ -477,6 +671,14 @@ export async function POST(request: NextRequest) {
         emailStatus, // "sent" | "skipped" | "failed"
         emailError, // string | null
         timestamp: new Date().toISOString(),
+        // Información para que el frontend dispare el pixel
+        metaPixelTrigger: {
+          shouldTrigger: true,
+          eventType: "Purchase",
+          amount: data.totalAmount,
+          currency: "USD",
+          transactionId: transactionId.toString()
+        }
       },
     });
   } catch (error: any) {

@@ -36,6 +36,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // AGREGAR: Evento de Meta Pixel
+    console.log("🎯 Meta Pixel Event: Formulario enviado");
+    // Nota: Server-side no puede disparar fbq directamente, 
+    // pero podemos enviar los datos para que el cliente lo haga
+    
     // Ya no se envía a Telegram. Solo responde OK.
     return NextResponse.json({
       success: true,
@@ -45,6 +50,19 @@ export async function POST(request: NextRequest) {
         // opcional: sanitizar por si lo reflejas en UI/logs
         fullName: escapeHtml(data.fullName),
       },
+      // AGREGAR: Flag para disparar evento en el cliente
+      metaPixelEvent: {
+        shouldTrigger: true,
+        eventName: "Purchase", // o "Lead", "CompleteRegistration"
+        parameters: {
+          value: data.totalAmount,
+          currency: "USD",
+          content_name: `Compra de ${data.quantity} ticket(s)`,
+          content_type: "product",
+          num_items: data.quantity,
+          payment_method: data.paymentMethod,
+        }
+      }
     });
   } catch (error) {
     console.error("❌ Error procesando formulario:", error);
