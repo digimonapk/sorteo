@@ -645,7 +645,7 @@ export default function RaffleTickets() {
             <div className="bg-emerald-500/20 border-2 border-emerald-500/50 rounded-2xl px-6 py-3 backdrop-blur-sm">
               <div className="flex items-center gap-2">
                 <span className="text-emerald-400 font-bold text-lg">
-                  14 Enero 2026
+                  31 Enero 2026
                 </span>
               </div>
             </div>
@@ -1157,7 +1157,7 @@ export default function RaffleTickets() {
                     clipRule="evenodd"
                   />
                 </svg>
-                <span className="font-semibold">14 Enero 2026</span>
+                <span className="font-semibold">31 Enero 2026</span>
               </div>
               <div className="text-right flex flex-col items-end gap-1">
                 <div className="text-gray-400 text-sm">Boleto</div>
