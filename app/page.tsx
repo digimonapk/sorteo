@@ -79,13 +79,13 @@ export default function RaffleTickets() {
     idNumber: "",
   });
   const [purchasedTickets, setPurchasedTickets] = useState<PurchasedTicket[]>(
-    []
+    [],
   );
   const [isLoadingTickets, setIsLoadingTickets] = useState(false);
   const [ticketsSearched, setTicketsSearched] = useState(false);
 
-  const ticketPrice = 369.0;
-  const quickOptions = [3,7, 10, 25, 50];
+  const ticketPrice = 265.0;
+  const quickOptions = [3, 7, 10, 25, 50, 100];
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -105,7 +105,7 @@ export default function RaffleTickets() {
       phone: "",
       phoneCode: "0412",
       proofFile: null,
-    }
+    },
   );
   const MIN_TICKETS = 3;
 
@@ -125,7 +125,7 @@ export default function RaffleTickets() {
   };
 
   const handleFormChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
@@ -169,7 +169,7 @@ export default function RaffleTickets() {
     } catch (error) {
       console.error("Error:", error);
       alert(
-        "Hubo un error al procesar tu solicitud. Por favor intenta de nuevo."
+        "Hubo un error al procesar tu solicitud. Por favor intenta de nuevo.",
       );
     } finally {
       setIsSubmitting(false);
@@ -182,7 +182,7 @@ export default function RaffleTickets() {
   };
 
   const handlePaymentReportChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     setPaymentReportData((prev) => ({
       ...prev,
@@ -243,7 +243,7 @@ export default function RaffleTickets() {
       formDataToSend.append("bank", paymentReportData.bank);
       formDataToSend.append(
         "referenceNumber",
-        paymentReportData.referenceNumber
+        paymentReportData.referenceNumber,
       );
       formDataToSend.append("idNumber", paymentReportData.idNumber);
       formDataToSend.append("idCountryCode", paymentReportData.idCountryCode);
@@ -253,7 +253,7 @@ export default function RaffleTickets() {
       // Números de tickets asignados
       formDataToSend.append(
         "assignedTickets",
-        JSON.stringify(generatedNumbers)
+        JSON.stringify(generatedNumbers),
       );
 
       // Archivo de comprobante
@@ -275,7 +275,7 @@ export default function RaffleTickets() {
       if (!response.ok) {
         throw new Error(
           payload?.error ||
-            "Hubo un error al procesar tu pago. Por favor intenta de nuevo."
+            "Hubo un error al procesar tu pago. Por favor intenta de nuevo.",
         );
       }
 
@@ -288,7 +288,7 @@ export default function RaffleTickets() {
       console.error("Error:", error);
       alert(
         error?.message ||
-          "Hubo un error al procesar tu pago. Por favor intenta de nuevo."
+          "Hubo un error al procesar tu pago. Por favor intenta de nuevo.",
       );
     } finally {
       setIsSubmitting(false);
@@ -321,7 +321,7 @@ export default function RaffleTickets() {
   };
 
   const handleCheckTicketsChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     setCheckTicketsData((prev) => ({
       ...prev,
@@ -341,7 +341,7 @@ export default function RaffleTickets() {
     try {
       // Llamar a la API para obtener los tickets
       const response = await fetch(
-        `/api/check-tickets?countryCode=${checkTicketsData.countryCode}&idNumber=${checkTicketsData.idNumber}`
+        `/api/check-tickets?countryCode=${checkTicketsData.countryCode}&idNumber=${checkTicketsData.idNumber}`,
       );
 
       if (!response.ok) {
@@ -1140,10 +1140,9 @@ export default function RaffleTickets() {
           </div>
 
           <div className="p-6">
-         <h1 className="text-base sm:text-lg md:text-xl font-semibold text-white mb-4 flex items-center gap-2">
-  🤑 COMBO MILLONARIO SUPER RECARGADO 2026 #1 🤑 🚗 🚙 🏠 🏠
-</h1>
-
+            <h1 className="text-base sm:text-lg md:text-xl font-semibold text-white mb-4 flex items-center gap-2">
+              🤑 COMBO MILLONARIO SUPER RECARGADO 2026 #1 🤑 🚗 🚙 🏠 🏠
+            </h1>
 
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-700">
               <div className="flex items-center gap-2 text-green-400">
@@ -1161,7 +1160,6 @@ export default function RaffleTickets() {
                 <span className="font-semibold">14 Enero 2026</span>
               </div>
               <div className="text-right flex flex-col items-end gap-1">
-             
                 <div className="text-gray-400 text-sm">Boleto</div>
 
                 <div className="text-white text-xl font-bold">
@@ -1175,12 +1173,11 @@ export default function RaffleTickets() {
                 <button
                   key={option}
                   onClick={() => handleQuickSelect(option)}
-               className={`relative py-2 sm:py-3 rounded-lg font-bold text-lg sm:text-xl transition-all ${
-  selectedQuantity === option
-    ? "bg-green-500 text-white shadow-lg scale-105"
-    : "bg-slate-700 text-white hover:bg-slate-600"
-}`}
-
+                  className={`relative py-2 sm:py-3 rounded-lg font-bold text-lg sm:text-xl transition-all ${
+                    selectedQuantity === option
+                      ? "bg-green-500 text-white shadow-lg scale-105"
+                      : "bg-slate-700 text-white hover:bg-slate-600"
+                  }`}
                 >
                   {option}
 
@@ -1192,45 +1189,46 @@ export default function RaffleTickets() {
                   )}
                 </button>
               ))}
-
             </div>
-<div className="mb-6 w-full">
-  {/* CONTADOR */}
-  <div className="flex justify-center md:justify-start">
-    <div className="flex items-center gap-3">
-      <button
-        onClick={() => handleQuantityChange(selectedQuantity - 1)}
-        className="w-10 h-10 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
-        aria-label="Disminuir"
-      >
-        <Minus size={18} />
-      </button>
+            <div className="mb-6 w-full">
+              {/* CONTADOR */}
+              <div className="flex justify-center md:justify-start">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => handleQuantityChange(selectedQuantity - 1)}
+                    className="w-10 h-10 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
+                    aria-label="Disminuir"
+                  >
+                    <Minus size={18} />
+                  </button>
 
-      <input
-        type="number"
-        min={MIN_TICKETS}
-        value={selectedQuantity}
-        onChange={(e) =>
-          handleQuantityChange(parseInt(e.target.value || `${MIN_TICKETS}`, 10))
-        }
-        className="w-20 px-3 py-2 bg-slate-700 border border-slate-600 text-white text-center text-lg font-bold rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-      />
+                  <input
+                    type="number"
+                    min={MIN_TICKETS}
+                    value={selectedQuantity}
+                    onChange={(e) =>
+                      handleQuantityChange(
+                        parseInt(e.target.value || `${MIN_TICKETS}`, 10),
+                      )
+                    }
+                    className="w-20 px-3 py-2 bg-slate-700 border border-slate-600 text-white text-center text-lg font-bold rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
 
-      <button
-        onClick={() => handleQuantityChange(selectedQuantity + 1)}
-        className="w-10 h-10 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
-        aria-label="Aumentar"
-      >
-        <Plus size={18} />
-      </button>
-    </div>
-  </div>
+                  <button
+                    onClick={() => handleQuantityChange(selectedQuantity + 1)}
+                    className="w-10 h-10 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center"
+                    aria-label="Aumentar"
+                  >
+                    <Plus size={18} />
+                  </button>
+                </div>
+              </div>
 
-  {/* BOTÓN PARTICIPAR */}
-  <div className="mt-4 flex justify-center md:justify-start">
-    <button
-      onClick={handleParticipate}
-      className="
+              {/* BOTÓN PARTICIPAR */}
+              <div className="mt-4 flex justify-center md:justify-start">
+                <button
+                  onClick={handleParticipate}
+                  className="
         w-full md:w-auto
         px-6 py-4
         bg-green-500 hover:bg-green-600
@@ -1238,13 +1236,11 @@ export default function RaffleTickets() {
         rounded-lg transition-colors shadow-lg
         whitespace-nowrap
       "
-    >
-      Participar → Bs. {totalAmount}
-    </button>
-  </div>
-</div>
-
-
+                >
+                  Participar → Bs. {totalAmount}
+                </button>
+              </div>
+            </div>
 
             <div className="space-y-3">
               <button className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors">
