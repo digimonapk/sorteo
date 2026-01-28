@@ -85,7 +85,7 @@ export default function RaffleTickets() {
   const [ticketsSearched, setTicketsSearched] = useState(false);
 
   const ticketPrice = 265.0;
-  const quickOptions = [3, 7, 10, 25, 50, 100];
+  const quickOptions = [7, 10, 25, 50, 100,200];
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -107,7 +107,7 @@ export default function RaffleTickets() {
       proofFile: null,
     },
   );
-  const MIN_TICKETS = 3;
+  const MIN_TICKETS = 7;
 
   const handleQuantityChange = (value: number) => {
     setSelectedQuantity(Math.max(MIN_TICKETS, value));
